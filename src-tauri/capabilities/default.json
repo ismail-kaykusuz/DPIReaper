@@ -1,0 +1,59 @@
+{
+  "identifier": "default",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled",
+    "core:window:allow-close",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-unminimize",
+    "core:window:allow-destroy",
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "binaries/dpireaper-proxy",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-kill",
+      "allow": [
+        {
+          "name": "binaries/dpireaper-proxy",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    },
+    "shell:allow-stdin-write",
+    "clipboard-manager:allow-write-text",
+    "notification:allow-notify",
+    "notification:allow-request-permission",
+    "notification:allow-is-permission-granted",
+    "dialog:allow-message",
+    "dialog:allow-ask",
+    "dialog:allow-open",
+    "fs:allow-read-text-file",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$DESKTOP/**" },
+        { "path": "$DOCUMENT/**" },
+        { "path": "$DOWNLOAD/**" }
+      ]
+    },
+    "process:allow-exit",
+    "shell:allow-open"
+  ]
+}

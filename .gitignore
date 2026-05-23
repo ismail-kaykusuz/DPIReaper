@@ -1,0 +1,42 @@
+# Node / Vite
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+.npm/
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/schemas/
+*.rs.bk
+
+# Lisans (asla commit etme!)
+.keys/
+license/
+*.lic
+license-*.txt
+ali-*.txt
+*-key.txt
+
+# Go portable SDK (büyük binary)
+_tools/
+
+# Kaynak SpoofDPI motoru (derlenmiş hali src-tauri/binaries'te)
+SpoofDPI-*/
+
+# Üretilen public ham dosyalar
+public/dpireaper-icon-1024.png
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Env / secrets
+.env
+.env.*
+!.env.example
