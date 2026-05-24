@@ -32,9 +32,6 @@
     "externalBin": [
       "binaries/dpireaper-proxy"
     ],
-    "resources": [
-      "binaries/npcap-installer.exe"
-    ],
     "targets": ["nsis", "msi"],
     "icon": [
       "icons/32x32.png",

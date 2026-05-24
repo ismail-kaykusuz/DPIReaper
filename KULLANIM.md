@@ -197,7 +197,6 @@ Kırmızı vurgulu bilgi kartı — DPIReaper kullanırken dikkat edilmesi gerek
 | Satır | Ne gösterir / yapar |
 |-------|---------------------|
 | **Logo + DPIReaper 1.0.0** | Marka ve sürüm |
-| **Lisans: MIT — Açık Kaynak** | Bilgilendirme |
 | **Gizlilik: Telemetri yok...** | Veri politikası |
 | **Kaynak Kodu → GitHub** (tıklanabilir) | Tarayıcıda repo açar (`openShell` ile sistem tarayıcısı) |
 | **Destek / Hata Bildirimi** (tıklanabilir) | GitHub Issues sayfası |
@@ -426,7 +425,6 @@ Sonra uygulamayı kapatıp açın — ilk kurulum sihirbazı tekrar çıkar.
 
 ## 15. Bilgilendirme
 
-- Lisans: **MIT**
 - Telemetri: **yok**
 - Veri konumu: **yalnızca cihazınız**
 - Kaynak motor: **SpoofDPI** (Go) — `src-tauri/binaries/dpireaper-proxy-x86_64-pc-windows-msvc.exe`

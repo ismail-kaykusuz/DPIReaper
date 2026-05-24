@@ -1,5 +1,5 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-mod license;
+mod isp_detect;
 
 use local_ip_address::list_afinet_netifas;
 use std::io::Write;
@@ -1430,39 +1430,6 @@ fn startup_proxy_cleanup() -> Result<bool, String> {
     Ok(false) // Temiz başlangıç
 }
 
-// 1. Sürücü kontrolü (lib.rs içine ekle)
-#[tauri::command]
-fn check_driver() -> bool {
-    std::path::Path::new("C:\\Windows\\System32\\wpcap.dll").exists()
-        || std::path::Path::new("C:\\Windows\\SysWOW64\\wpcap.dll").exists()
-}
-
-// 2. Sürücü kurulumu (lib.rs içine ekle)
-#[tauri::command]
-fn install_driver(app: tauri::AppHandle) -> Result<(), String> {
-    let resource_path = app
-        .path()
-        .resource_dir()
-        .map_err(|e| e.to_string())?
-        .join("binaries/npcap-installer.exe");
-
-    if !resource_path.exists() {
-        return Err("Sürücü dosyası bulunamadı. Lütfen uygulamayı yeniden yükleyin.".into());
-    }
-
-    // P0-FIX: Driver kurulumunu görünür yaptık (/S kaldırıldı, CREATE_NO_WINDOW kaldırıldı)
-    // Bu sayede kullanıcı UAC (Yönetici İzni) uyarısını görebilir ve kurulumu tamamlayabilir.
-    let status = std::process::Command::new(resource_path)
-        .status() // Normal status call, shows window
-        .map_err(|e| e.to_string())?;
-
-    if status.success() {
-        Ok(())
-    } else {
-        Err("Kurulum kullanıcı tarafından iptal edildi veya başarısız oldu.".into())
-    }
-}
-
 /// Windows Defender ağ/ dosya taramasından dpireaper-proxy ve kurulum klasörünü muaf tutar.
 /// Yönetici yetkisi gerekir (Add-MpPreference).
 #[tauri::command]
@@ -1735,10 +1702,8 @@ pub fn run() {
             check_dns_latency,
             save_sidecar_pid,
             startup_proxy_cleanup,
-            check_driver,
-            install_driver,
             add_defender_exclusions,
-            license::verify_license,
+            isp_detect::detect_isp,
             quit_app
         ])
         .build(tauri::generate_context!())

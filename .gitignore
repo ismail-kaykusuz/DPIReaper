@@ -11,14 +11,6 @@ src-tauri/target/
 src-tauri/gen/schemas/
 *.rs.bk
 
-# Lisans (asla commit etme!)
-.keys/
-license/
-*.lic
-license-*.txt
-ali-*.txt
-*-key.txt
-
 # Go portable SDK (büyük binary)
 _tools/
 
@@ -31,6 +23,7 @@ public/dpireaper-icon-1024.png
 # IDE / OS
 .vscode/
 .idea/
+.vs/
 .DS_Store
 Thumbs.db
 *.swp
@@ -40,3 +33,5 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+.keys/
+license/

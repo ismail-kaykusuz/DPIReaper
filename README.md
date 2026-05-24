@@ -121,10 +121,6 @@ scripts/
 plan.md                    Faz 1-4 ürün geliştirme planı
 ```
 
-## Lisans
-
-MIT — bkz. [`LICENSE`](LICENSE)
-
 ## Gizlilik
 
 DPIReaper hiçbir telemetri veya kullanım verisi göndermez. Tüm yapılandırma yerel `localStorage` ve `src-tauri` config dosyalarında tutulur.

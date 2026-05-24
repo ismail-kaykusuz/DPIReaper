@@ -53,16 +53,35 @@
   --text-secondary: #a1a1aa;
   --text-tertiary: #71717a;
 
-  /* Brand accent — tek vurgu (kırmızı) */
-  --accent: #ef4444;
-  --accent-hover: #dc2626;
-  --accent-soft: rgba(239, 68, 68, 0.12);
-  --accent-softer: rgba(239, 68, 68, 0.06);
-  --accent-glow: rgba(239, 68, 68, 0.25);
+  /* Brand accent — navigasyon, seçili kart, birincil CTA */
+  --accent: #007fff;
+  --accent-hover: #0066cc;
+  --accent-soft: rgba(0, 127, 255, 0.12);
+  --accent-softer: rgba(0, 127, 255, 0.06);
+  --accent-glow: rgba(0, 127, 255, 0.28);
 
-  /* Legacy semantic — yalnızca durum metni / log seviyeleri için */
-  --accent-blue: #3b82f6;
-  --accent-green: #10b981;
+  /* Success — bağlı / güvenli durum */
+  --success: #00e676;
+  --success-hover: #00c853;
+  --success-soft: rgba(0, 230, 118, 0.12);
+  --success-softer: rgba(0, 230, 118, 0.06);
+  --success-glow: rgba(0, 230, 118, 0.32);
+
+  /* Danger — hata, bağlantı kes, kritik uyarı */
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+  --danger-soft: rgba(239, 68, 68, 0.12);
+  --danger-softer: rgba(239, 68, 68, 0.06);
+  --danger-glow: rgba(239, 68, 68, 0.28);
+
+  /* Warning — bilgi banner'ları */
+  --warning: #f59e0b;
+  --warning-soft: rgba(245, 158, 11, 0.12);
+  --warning-border: rgba(245, 158, 11, 0.35);
+
+  /* Legacy semantic — log seviyeleri */
+  --accent-blue: #007fff;
+  --accent-green: #00e676;
   --accent-yellow: #f59e0b;
   --accent-red: #ef4444;
 
@@ -180,12 +199,21 @@ body {
   height: 70%;
   background: radial-gradient(
     ellipse at center,
-    rgba(239, 68, 68, 0.04) 0%,
+    rgba(0, 127, 255, 0.03) 0%,
     transparent 60%
   );
   content: "";
   transform: translateX(-50%);
   pointer-events: none;
+  transition: background var(--transition-slow);
+}
+
+.app-container.is-connected::before {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 230, 118, 0.07) 0%,
+    transparent 62%
+  );
 }
 
 .fade-in {
@@ -204,19 +232,18 @@ body {
 }
 
 /* ==========================================
-   HEADER - Glassmorphism
+   WINDOW DRAG REGION — ince üst boşluk
    ========================================== */
+.window-drag {
+  flex: 0 0 auto;
+  height: 28px;
+  width: 100%;
+  -webkit-app-region: drag;
+}
+
+/* Eski header sınıfları geriye dönük uyum için bırakıldı */
 .app-header {
-  position: relative;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.5rem 1.75rem;
-  border-bottom: 1px solid var(--border-subtle);
-  background: rgba(10, 10, 18, 0.7);
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
+  display: none;
 }
 
 .brand {
@@ -232,7 +259,7 @@ body {
   max-width: 88px;
   object-fit: contain;
   object-position: left center;
-  filter: drop-shadow(0 2px 8px rgba(220, 38, 38, 0.35));
+  filter: drop-shadow(0 2px 8px rgba(0, 127, 255, 0.22));
   background: transparent;
 }
 
@@ -243,7 +270,7 @@ body {
   object-fit: contain;
   object-position: center;
   background: transparent;
-  filter: drop-shadow(0 6px 20px rgba(220, 38, 38, 0.35));
+  filter: drop-shadow(0 6px 20px rgba(0, 127, 255, 0.22));
 }
 
 .app-logo--header {
@@ -278,10 +305,9 @@ body {
   border-radius: 99px;
   color: var(--text-secondary);
   background: var(--surface-1);
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  font-size: 0.62rem;
-  font-weight: 700;
+  letter-spacing: 0.2px;
+  font-size: 0.68rem;
+  font-weight: 600;
   gap: 0.5rem;
 }
 
@@ -292,9 +318,9 @@ body {
 }
 
 .status-badge.active {
-  border-color: var(--accent-glow);
-  color: var(--accent);
-  background: var(--accent-soft);
+  border-color: var(--success-glow);
+  color: var(--success);
+  background: var(--success-soft);
 }
 
 .status-badge.processing {
@@ -323,12 +349,38 @@ body {
   flex: 1;
   flex-direction: column;
   justify-content: center;
-  padding: 2.5rem 2rem;
+  padding: 1.5rem 1.75rem 1rem;
+  gap: 1.5rem;
 }
 
 /* Shield Circle - CPU-Optimized */
 .shield-wrapper {
-  margin-bottom: 2.25rem;
+  position: relative;
+  margin: 0;
+}
+
+.shield-wave {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--success-glow) 0%, transparent 68%);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: shieldWave 2.8s ease-in-out infinite;
+}
+
+@keyframes shieldWave {
+  0%, 100% {
+    opacity: 0.35;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  50% {
+    opacity: 0.7;
+    transform: translate(-50%, -50%) scale(1.06);
+  }
 }
 
 .shield-circle {
@@ -359,21 +411,21 @@ body {
   will-change: color, opacity;
 }
 
-/* Connected State - kırmızı vurgu */
+/* Connected State — güvenli yeşil vurgu */
 .shield-circle.connected {
-  border-color: var(--accent-glow);
-  background: var(--accent-soft);
-  box-shadow: 0 0 24px var(--accent-glow);
+  border-color: var(--success-glow);
+  background: var(--success-soft);
+  box-shadow: 0 0 28px var(--success-glow);
   animation: connectPulse 0.5s ease-out;
 }
 
 .shield-circle.connected::before {
-  border-color: var(--accent-soft);
+  border-color: var(--success-soft);
 }
 
 .shield-circle.connected .shield-icon {
   opacity: 1;
-  color: var(--accent);
+  color: var(--success);
 }
 
 /* Processing State - nötr breathe */
@@ -422,96 +474,55 @@ body {
 
 /* Status Text */
 .status-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
+  gap: 4px;
 }
 
 .status-title {
-  margin-bottom: 0.5rem;
+  margin: 0;
   color: var(--text-primary);
-  text-transform: uppercase;
-  letter-spacing: 3.5px;
-  font-size: 1.45rem;
-  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.15;
 }
 
 .status-title.connected {
-  color: var(--accent);
+  color: var(--success);
 }
 
 .status-title.processing {
   color: var(--text-secondary);
-  letter-spacing: 2px;
   font-size: 1.25rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .status-desc {
+  margin: 0;
   color: var(--text-secondary);
-  letter-spacing: 0.3px;
-  font-size: 0.88rem;
+  letter-spacing: 0.1px;
+  font-size: 0.82rem;
   font-weight: 500;
+  line-height: 1.4;
 }
 
-/* Faz 5 — Lisans süresi yaklaşıyor banner'ı */
-.license-banner {
+/* Stats yığını — chip + grafik tek bir görsel blok */
+.stats-stack {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
+  width: min(100%, 260px);
   gap: 8px;
-  padding: 8px 16px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  border-bottom: 1px solid var(--border-subtle);
-  transition: filter var(--transition-fast);
-  overflow: hidden;
-}
-
-.license-banner:hover {
-  filter: brightness(1.1);
-}
-
-.license-banner--info {
-  background: var(--surface-2);
-  color: var(--text-secondary);
-}
-
-.license-banner--info strong {
-  color: var(--text-primary);
-}
-
-.license-banner--warning {
-  background: rgba(245, 158, 11, 0.15);
-  color: var(--accent-yellow);
-  border-color: rgba(245, 158, 11, 0.25);
-}
-
-.license-banner--warning strong {
-  color: #fde68a;
-}
-
-.license-banner--critical {
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-color: var(--accent-glow);
-}
-
-.license-banner--critical strong {
-  color: var(--accent);
-}
-
-.license-banner-action {
-  margin-left: auto;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.85;
 }
 
 /* Status summary — bağlıyken Profil · DNS şeridi */
 .status-summary {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 14px;
   padding: 6px 14px;
   border: 1px solid var(--border-default);
@@ -520,6 +531,7 @@ body {
   color: var(--text-secondary);
   font-size: 0.7rem;
   letter-spacing: 0.4px;
+  align-self: center;
 }
 
 .status-summary-item {
@@ -530,10 +542,9 @@ body {
 
 .status-summary-label {
   color: var(--text-tertiary);
-  text-transform: uppercase;
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.8px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
 }
 
 .status-summary-value {
@@ -554,7 +565,7 @@ body {
 .action-area {
   position: relative;
   z-index: 10;
-  padding: 0 2rem 2rem;
+  padding: 0 1.5rem 1.25rem;
 }
 
 .main-btn {
@@ -564,20 +575,19 @@ body {
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 56px;
+  height: 50px;
   border: none;
   border-radius: 14px;
   cursor: pointer;
   transition: all var(--transition-base);
-  text-transform: uppercase;
-  letter-spacing: 1.6px;
-  font-size: 0.93rem;
-  font-weight: 800;
-  gap: 0.7rem;
+  letter-spacing: 0.2px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  gap: 0.6rem;
   will-change: transform;
 }
 
-/* Connect State - kırmızı vurgu (kurumsal) */
+/* Connect — marka mavisi CTA */
 .main-btn.connect {
   color: #ffffff;
   background: var(--accent);
@@ -594,17 +604,18 @@ body {
   transform: translateY(0);
 }
 
-/* Disconnect State - nötr (zaten bağlı) */
+/* Disconnect — tehlike kırmızısı */
 .main-btn.disconnect {
-  color: var(--text-primary);
-  border: 1px solid var(--border-default);
-  background: var(--surface-2);
-  box-shadow: var(--shadow-sm);
+  color: var(--danger);
+  border: 1px solid var(--danger-glow);
+  background: var(--danger-soft);
+  box-shadow: none;
 }
 
 .main-btn.disconnect:hover:not(.processing) {
-  border-color: var(--border-strong);
-  background: var(--surface-3);
+  border-color: var(--danger);
+  background: var(--danger-softer);
+  color: var(--danger-hover);
   transform: translateY(-1px);
 }
 
@@ -619,6 +630,43 @@ body {
   pointer-events: none;
 }
 
+/* Icon-only circular variant */
+.main-btn.icon-only {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto;
+  padding: 0;
+  border-radius: 50%;
+  gap: 0;
+}
+
+.main-btn.icon-only.connect {
+  box-shadow: 0 6px 20px var(--accent-glow), 0 0 0 0 var(--accent-glow);
+  animation: main-btn-breathe 2.4s ease-in-out infinite;
+}
+
+.main-btn.icon-only.connect:hover:not(.processing) {
+  box-shadow: 0 8px 26px var(--accent-glow), 0 0 0 6px var(--accent-glow);
+  animation: none;
+}
+
+.main-btn.icon-only.disconnect {
+  box-shadow: none;
+}
+
+.main-btn.icon-only.disconnect:hover:not(.processing) {
+  box-shadow: 0 4px 14px var(--danger-glow);
+}
+
+@keyframes main-btn-breathe {
+  0%, 100% {
+    box-shadow: 0 6px 20px var(--accent-glow), 0 0 0 0 var(--accent-glow);
+  }
+  50% {
+    box-shadow: 0 6px 20px var(--accent-glow), 0 0 0 8px transparent;
+  }
+}
+
 /* ==========================================
    BOTTOM NAVIGATION
    ========================================== */
@@ -628,9 +676,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-around;
-  padding: 1.2rem 0.5rem;
+  padding: 0.55rem 0.5rem 0.7rem;
   border-top: 1px solid var(--border-subtle);
-  background: rgba(10, 10, 18, 0.85);
+  background: rgba(10, 10, 18, 0.92);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
 }
@@ -641,18 +689,29 @@ body {
   flex: 1;
   flex-direction: column;
   justify-content: center;
-  padding: 0.5rem 0.2rem;
+  padding: 0.35rem 0.2rem;
   border: none;
+  border-radius: 10px;
   color: var(--text-tertiary);
   background: none;
   cursor: pointer;
-  transition: color var(--transition-fast);
+  transition: all var(--transition-fast);
   text-align: center;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.1px;
   font-size: 0.62rem;
-  font-weight: 700;
-  gap: 0.35rem;
+  font-weight: 600;
+  gap: 0.2rem;
+}
+
+.nav-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.nav-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-subtle);
 }
 
 .nav-btn:hover {
@@ -667,15 +726,10 @@ body {
   color: var(--accent);
 }
 
-.nav-divider {
-  width: 1px;
-  height: 22px;
-  background: var(--border-subtle);
-}
-
-/* Settings — seçili öğe (tek vurgu, kırmızı) */
+/* Settings — seçili öğe (glow) */
 .v2-item.v2-selected {
   background: var(--accent-softer) !important;
+  box-shadow: inset 0 0 0 1px var(--accent-glow);
 }
 
 .v2-item.v2-selected .v2-item-text h3 {
@@ -1062,7 +1116,7 @@ body {
 .v2-card {
   overflow: hidden;
   border: 1px solid var(--border-subtle);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--bg-elevated);
   contain: layout style;
 }
@@ -1272,8 +1326,247 @@ body {
 }
 
 .v2-latency.fast {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+/* Bilgi / uyarı banner'ları */
+.info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--warning-border);
+  border-radius: 12px;
+  background: var(--warning-soft);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.info-banner-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--warning);
+}
+
+.info-banner-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.info-banner-title {
+  margin-bottom: 2px;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.info-banner-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.info-banner-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  color: var(--text-primary);
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.info-banner-btn:hover {
+  border-color: var(--accent-glow);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Npcap / uyarı ikonları */
+.v2-icon--warning {
+  border-color: var(--warning-border) !important;
+  color: var(--warning) !important;
+  background: var(--warning-soft) !important;
+}
+
+.v2-icon--success {
+  border-color: var(--success-glow) !important;
+  color: var(--success) !important;
+  background: var(--success-soft) !important;
+}
+
+/* Kurumsal ikincil aksiyon butonu */
+.btn-install {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--accent-glow);
+  border-radius: 12px;
+  color: #fff;
+  background: var(--accent);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  font-size: 0.84rem;
+  font-weight: 600;
+  gap: 8px;
+}
+
+.btn-install:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 4px 14px var(--accent-glow);
+  transform: translateY(-1px);
+}
+
+.btn-install:active {
+  transform: translateY(0);
+}
+
+.profile-badge-recommended {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--accent-glow);
+  border-radius: 99px;
   color: var(--accent);
   background: var(--accent-soft);
+  vertical-align: middle;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+}
+
+.profile-badge-isp {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--success-glow);
+  border-radius: 99px;
+  color: var(--success);
+  background: var(--success-soft);
+  vertical-align: middle;
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+
+.profile-defender-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+}
+
+.info-banner--isp {
+  border-color: var(--accent-glow);
+  background: var(--accent-softer);
+}
+
+.info-banner-icon--accent {
+  color: var(--accent) !important;
+}
+
+.info-banner-btn--accent {
+  border-color: var(--accent-glow);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.info-banner-btn--accent:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Canlı bypass grafiği */
+.bypass-graph {
+  width: 100%;
+  padding: 8px 12px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-1);
+}
+
+.bypass-graph-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.bypass-graph-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.bypass-graph-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  flex-shrink: 0;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bypass-graph-pulse.is-live {
+  background: var(--success);
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
+  animation: bypass-pulse 1.6s ease-out infinite;
+}
+
+.bypass-graph-pulse.is-idle {
+  background: var(--text-tertiary);
+  opacity: 0.4;
+}
+
+@keyframes bypass-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
+.bypass-graph-svg {
+  display: block;
+  width: 100%;
+  height: 26px;
+  margin-top: 4px;
+}
+
+.bypass-graph-hint {
+  margin-top: 4px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 0.62rem;
+  letter-spacing: 0.1px;
+  line-height: 1.3;
 }
 
 .v2-refresh-btn {

@@ -1,5 +1,6 @@
 import Settings, { ConnectionProfilePicker } from "./Settings";
-import License from "./License";
+import BypassGraph from "./components/BypassGraph";
+import { createBypassStatsTracker } from "./bypassStats";
 import { detectProfileTier } from "./profiles";
 import { motion, AnimatePresence } from "framer-motion";
 // autostart importları Settings.jsx'te kullanılıyor, burada gerek yok
@@ -44,60 +45,6 @@ import "./App.css";
 const PURIFY_CONFIG = { ALLOWED_TAGS: ['strong', 'em', 'br', 'span', 'b'], ALLOWED_ATTR: ['class'] };
 
 function App() {
-  // Faz 5 — Lisans gate state
-  // null = henüz kontrol edilmedi, 'enter' = lisans yok, 'expired' = süresi dolmuş, 'ok' = geçerli
-  const [licenseState, setLicenseState] = useState(null);
-  const [licenseInfo, setLicenseInfo] = useState(null);
-  const [expiredInfo, setExpiredInfo] = useState(null);
-
-  useEffect(() => {
-    const stored = localStorage.getItem(LS_KEYS.license);
-    if (!stored) {
-      setLicenseState('enter');
-      return;
-    }
-    invoke('verify_license', { token: stored })
-      .then((status) => {
-        if (status?.valid) {
-          setLicenseInfo(status);
-          setLicenseState('ok');
-        } else {
-          setExpiredInfo(status);
-          // Süre dolduysa süresi dolmuş ekranı, yoksa giriş ekranı
-          if (status?.reason && status.reason.includes('süre')) {
-            setLicenseState('expired');
-          } else {
-            setLicenseState('enter');
-          }
-        }
-      })
-      .catch(() => setLicenseState('enter'));
-  }, []);
-
-  // Lisans her dakikada bir yeniden kontrol — süre dolarsa otomatik kilitlenir
-  useEffect(() => {
-    if (licenseState !== 'ok') return;
-    const interval = setInterval(async () => {
-      const stored = localStorage.getItem(LS_KEYS.license);
-      if (!stored) {
-        setLicenseState('enter');
-        return;
-      }
-      try {
-        const status = await invoke('verify_license', { token: stored });
-        if (status?.valid) {
-          setLicenseInfo(status);
-        } else {
-          setExpiredInfo(status);
-          setLicenseState('expired');
-        }
-      } catch {
-        // ignore
-      }
-    }, 60_000);
-    return () => clearInterval(interval);
-  }, [licenseState]);
-
   const [isConnected, setIsConnected] = useState(false);
   const [logs, setLogs] = useState([]);
   const [currentPort, setCurrentPort] = useState(8080);
@@ -128,6 +75,68 @@ function App() {
   const [appIsClosingState, setAppIsClosingState] = useState(false); // Shutdown UX
   const [closingStep, setClosingStep] = useState(0);
   const [closingDots, setClosingDots] = useState("");
+  const [ispDetection, setIspDetection] = useState(null);
+  const [bypassStats, setBypassStats] = useState(null);
+  const bypassTrackerRef = useRef(null);
+  const bypassPendingRef = useRef(null);
+  const bypassFlushTimerRef = useRef(null);
+  // PERF: log satırlarını rAF/100ms ile gruplayıp tek setState'te yaz
+  const logQueueRef = useRef([]);
+  const logFlushRafRef = useRef(0);
+
+  // ingest() her satırda setState yerine 250ms'de bir flush — re-render maliyetini düşürür
+  const flushBypassStats = (snap) => {
+    bypassPendingRef.current = snap;
+    if (bypassFlushTimerRef.current) return;
+    bypassFlushTimerRef.current = setTimeout(() => {
+      bypassFlushTimerRef.current = null;
+      if (bypassPendingRef.current) {
+        setBypassStats(bypassPendingRef.current);
+        bypassPendingRef.current = null;
+      }
+    }, 250);
+  };
+
+  useEffect(() => {
+    if (!bypassTrackerRef.current) {
+      bypassTrackerRef.current = createBypassStatsTracker();
+      setBypassStats(bypassTrackerRef.current.snapshot());
+    }
+    invoke("detect_isp")
+      .then((result) => setIspDetection(result))
+      .catch(() => setIspDetection(null));
+    return () => {
+      if (bypassFlushTimerRef.current) clearTimeout(bypassFlushTimerRef.current);
+      if (logFlushRafRef.current) cancelAnimationFrame(logFlushRafRef.current);
+    };
+  }, []);
+
+  // PERF: Heartbeat — sayfa görünür değilse durdur, görünürse 1sn'de bir grafik tick'i
+  useEffect(() => {
+    if (!isConnected) return undefined;
+    let id = null;
+    const start = () => {
+      if (id || document.visibilityState === 'hidden') return;
+      id = setInterval(() => {
+        if (bypassTrackerRef.current) {
+          setBypassStats(bypassTrackerRef.current.tick());
+        }
+      }, 1000);
+    };
+    const stop = () => {
+      if (id) { clearInterval(id); id = null; }
+    };
+    const onVisChange = () => {
+      if (document.visibilityState === 'hidden') stop();
+      else start();
+    };
+    start();
+    document.addEventListener('visibilitychange', onVisChange);
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisChange);
+    };
+  }, [isConnected]);
 
   useEffect(() => {
     if (appIsClosingState) {
@@ -208,7 +217,8 @@ function App() {
       autoStart: false,
       autoConnect: false,
       minimizeToTray: false,
-      dnsMode: "manual",
+      // İlk kurulumda Otomatik DNS önerilir — en hızlı sunucuyu kendisi seçer.
+      dnsMode: "auto",
       selectedDns: "cloudflare",
       autoReconnect: true,
       // Faz 3 — Varsayılan: Önerilen profil (mid / mode 1 / chunk 2)
@@ -230,15 +240,24 @@ function App() {
         }
         const parsed = JSON.parse(parsedStr);
         if (typeof parsed !== 'object' || parsed === null) return defaultSettings;
-        
+
+        // Migration: 'system' DNS seçeneği UI'dan kaldırıldı, otomatik seçime taşı
+        let migratedDns = parsed.selectedDns;
+        let migratedMode = parsed.dnsMode;
+        if (migratedDns === 'system') {
+          migratedDns = 'cloudflare';
+          migratedMode = 'auto';
+        }
+
         // P1-FIX: Load esnasında Sidecar Injection'u engellemek için tip güvenlik (Config Validation)
         // ✅ FIX: httpsChunkSize artık 1 ve 2 değerlerini de kabul ediyor (ISS profil değerleri)
-        return { 
-          ...defaultSettings, 
+        return {
+          ...defaultSettings,
           ...parsed,
           dpiMethod: ['0', '1', '2'].includes(String(parsed.dpiMethod)) ? String(parsed.dpiMethod) : defaultSettings.dpiMethod,
           httpsChunkSize: [1, 2, 4, 8, 16, 32, 64, 128].includes(Number(parsed.httpsChunkSize)) ? Number(parsed.httpsChunkSize) : defaultSettings.httpsChunkSize,
-          selectedDns: typeof parsed.selectedDns === 'string' ? parsed.selectedDns : defaultSettings.selectedDns,
+          selectedDns: typeof migratedDns === 'string' ? migratedDns : defaultSettings.selectedDns,
+          dnsMode: typeof migratedMode === 'string' ? migratedMode : defaultSettings.dnsMode,
         };
       } catch (e) {
         console.error("Failed to parse config:", e);
@@ -360,6 +379,19 @@ function App() {
     return value;
   };
 
+  // PERF: setState'i her satırda değil, requestAnimationFrame'de bir kez tetikle.
+  // Yoğun trafikte saniyede 100+ log gelirse: önceden 100 re-render → şimdi ~60.
+  const flushLogQueue = () => {
+    logFlushRafRef.current = 0;
+    const queued = logQueueRef.current;
+    if (queued.length === 0) return;
+    logQueueRef.current = [];
+    setLogs((prev) => {
+      const next = prev.length === 0 ? queued : prev.concat(queued);
+      return next.length > APP.maxLogs ? next.slice(-APP.maxLogs) : next;
+    });
+  };
+
   const addLog = (msg, type = "info", meta = {}) => {
     const { i18nKey, i18nParams } = meta;
 
@@ -371,21 +403,17 @@ function App() {
     if (!finalMsg || finalMsg.toString().trim().length === 0) return;
 
     const cleanMsg = finalMsg.toString().replace(/\x1b\[[0-9;]*m/g, "");
-    // ✅ #12: Sadece 100'ü aşınca kırp (her seferinde slice yerine)
-    setLogs((prev) => {
-      const next = [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          time: new Date().toLocaleTimeString(),
-          msg: cleanMsg,
-          type,
-          i18nKey: i18nKey || null,
-          i18nParams: i18nParams || null,
-        },
-      ];
-      return next.length > APP.maxLogs ? next.slice(-APP.maxLogs) : next;
+    logQueueRef.current.push({
+      id: crypto.randomUUID(),
+      time: new Date().toLocaleTimeString(),
+      msg: cleanMsg,
+      type,
+      i18nKey: i18nKey || null,
+      i18nParams: i18nParams || null,
     });
+    if (!logFlushRafRef.current) {
+      logFlushRafRef.current = requestAnimationFrame(flushLogQueue);
+    }
   };
 
   // Dil değiştiğinde i18n loglarını güncelle
@@ -635,7 +663,8 @@ function App() {
 
       const listenAddr = `${bindAddr}:${port}`;
       const dohUrl = DOH_MAP[currentDns];
-      const hasDriver = await invoke("check_driver");
+      // Npcap sürücüsü artık UI'dan kaldırıldı — her zaman chunk-only stratejisi
+      const hasDriver = false;
 
       const { args, logs: engineLogs } = buildProxyEngineArgs({
         config: configRef.current,
@@ -672,12 +701,26 @@ function App() {
         );
 
       const handleOutput = async (line, type) => {
+        if (!line || line.length === 0) return;
+        // PERF: trim'i ve toLowerCase'i sadece gerektiğinde yap
+        // İlk hızlı kontrol: prefix-based level filter
+        const c0 = line.charCodeAt(0);
+        const isLevelPrefix =
+          (c0 === 68 || c0 === 100 || c0 === 73 || c0 === 105 || c0 === 87 || c0 === 119 || c0 === 69 || c0 === 101) &&
+          /^(DBG|INF|WRN|ERR|DEBUG|INFO|WARN|ERROR)\b/i.test(line);
+
+        // Bypass sayaç motoru — her satırda çalışır ama regex'ten önce ucuz includes filter var
+        const statsSnap = bypassTrackerRef.current?.ingest(line);
+        if (statsSnap) flushBypassStats(statsSnap);
+
+        // Seviye prefix'li satırlar user-facing log'a yansımaz (info/debug/warn/error)
+        if (isLevelPrefix) return;
+
         const trimmedLine = line.trim();
+        if (trimmedLine.length === 0) return;
         const lowerLine = line.toLowerCase();
 
-        if (trimmedLine.length === 0) return;
-        if (/^(DBG|INF|WRN|ERR)\s+\d{4}-/.test(trimmedLine)) return;
-        if (line.includes("888")) return;
+        if (line.indexOf("888") !== -1) return;
         if (isTunnelShutdownNoise(line)) return;
 
         if (SKIP_PATTERN.test(line)) return;
@@ -793,6 +836,8 @@ function App() {
 
           setIsConnected(true);
           setIsProcessing(false);
+          bypassTrackerRef.current?.reset();
+          setBypassStats(bypassTrackerRef.current?.snapshot() ?? null);
           addLog(t.logConnected, "success", { i18nKey: "logConnected" });
           notifyUser(APP.name, t.logConnected, "connect");
           updateTrayTooltip("connected");
@@ -886,6 +931,8 @@ function App() {
 
           setIsConnected(false);
           setIsProcessing(false);
+          bypassTrackerRef.current?.reset();
+          setBypassStats(bypassTrackerRef.current?.snapshot() ?? null);
           childProcess.current = null;
           (async () => {
             try {
@@ -896,20 +943,6 @@ function App() {
             }
           })();
           updateTrayTooltip("disconnected"); // ✅ Bağlantı koptu (geçici)
-
-          // ✅ Hızlı crash tespiti: Güçlü Mod + Fake Paket crash’i ise Npcap sorunu (Ölümcül hatayı override et)
-          const isStrongWithFake = configRef.current.dpiMethod === '2' && configRef.current.advancedBypass !== false;
-          if (fatalErrorRef.current && isStrongWithFake) {
-            addLog(t.logNpcapFallback || "⚠️ Npcap sürücüsü yanıt vermiyor. Gelişmiş bypass kapatılıp tekrar deneniyor...", "warn");
-            configRef.current = { ...configRef.current, advancedBypass: false };
-            setConfig(prev => ({ ...prev, advancedBypass: false }));
-            localStorage.setItem(LS_KEYS.config, JSON.stringify({ ...configRef.current, advancedBypass: false }));
-            retryCount.current = 0; // Reset retry
-            fatalErrorRef.current = false; // Hatayı temizle, tekrar denesin
-            setIsProcessing(true);
-            attemptReconnect();
-            return;
-          }
 
           // ✅ Otomatik yeniden bağlanma kontrol
           const autoReconnectEnabled =
@@ -1082,9 +1115,10 @@ function App() {
   };
 
   useEffect(() => {
-    // logsEndRef
+    // PERF: Sadece log paneli açıkken kaydırma yap — kapalıyken DOM erişimi gereksiz
+    if (!showLogs) return;
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [logs]);
+  }, [logs, showLogs]);
 
   // ✅ #4: useRef kullanarak stale closure önlenir (useState idi)
   const isAppClosingRef = useRef(false);
@@ -1199,7 +1233,7 @@ function App() {
       setIsProcessing(true);
       startEngine(0);
     }, 2500); // Portun serbest kalması için (SpoofDPI 1.2.1 / TIME_WAIT)
-  }, [config.dpiMethod, config.httpsChunkSize, config.lowCpuMode, config.advancedBypass, config.selectedDns, config.dnsMode, config.enableWinhttp, config.ipv4Only, isConnected]);
+  }, [config.dpiMethod, config.httpsChunkSize, config.lowCpuMode, config.selectedDns, config.dnsMode, config.enableWinhttp, config.ipv4Only, isConnected]);
 
   useEffect(() => {
     // Initial cleanup on mount
@@ -1223,6 +1257,16 @@ function App() {
         // ✅ Sorun 1: Proxy'yi temizle (çökme sonrası kalıntı)
         await clearProxy(true);
         updateTrayTooltip("disconnected");
+
+        // İlk kurulumda sessizce Defender istisnası ekle (UAC reddedilirse / başarısızsa yutulur).
+        // Kullanıcıya popup gösterilmez. Başarılı olursa flag set edilir ve bir daha denenmez.
+        if (!localStorage.getItem(LS_KEYS.defenderExclusionAdded)) {
+          invoke("add_defender_exclusions")
+            .then(() => localStorage.setItem(LS_KEYS.defenderExclusionAdded, "1"))
+            .catch(() => {
+              // sessizce yut — kullanıcı yönetici değilse veya iptal ederse normaldir
+            });
+        }
 
         // P1-FIX: Auto-Connect Race Condition çözümü (Temizlik adımları tamamlandıktan SONRA bağlan)
         // ✅ İlk giriş overlay'ı açıksa auto-connect yapma — kullanıcı ISS seçsin önce
@@ -1528,33 +1572,8 @@ function App() {
     };
   }, []);
 
-  // Faz 5 — Lisans henüz kontrol edilmediyse boş bir splash; geçersizse License gate.
-  if (licenseState === null) {
-    return <div className="app-container" style={{ background: 'var(--bg-base)' }} />;
-  }
-  if (licenseState !== 'ok') {
-    return (
-      <div className="app-container fade-in">
-        <License
-          t={t}
-          mode={licenseState}
-          expiredStatus={expiredInfo}
-          onSuccess={(status) => {
-            setLicenseInfo(status);
-            setExpiredInfo(null);
-            setLicenseState('ok');
-          }}
-          onQuit={async () => {
-            try { await invoke('quit_app'); } catch { window.close(); }
-          }}
-        />
-      </div>
-    );
-  }
-
-  // Render — lisans geçerli, normal akış
   return (
-    <div className="app-container fade-in">
+    <div className={`app-container fade-in${isConnected ? ' is-connected' : ''}`}>
       <AnimatePresence>
         {appIsClosingState && (
           <motion.div
@@ -1825,6 +1844,7 @@ function App() {
                 updateConfig={updateConfig}
                 t={t}
                 compact={true}
+                ispDetection={ispDetection}
               />
 
               <button
@@ -1869,27 +1889,8 @@ function App() {
         )}
       </AnimatePresence>
 
-      {/* Header */}
-      <header className="app-header">
-        <div className="brand">
-          <img src={APP.logo} alt="DPIReaper" className="brand-logo" />
-          <span className="brand-name">DPIReaper</span>
-        </div>
-        <div
-          className={`status-badge ${isConnected ? "active" : isProcessing ? "processing" : "passive"}`}
-        >
-          <div className="status-dot" />
-          <span>
-            {isProcessing
-              ? isConnected
-                ? t.statusDisconnecting
-                : t.statusConnecting
-              : isConnected
-                ? t.statusActive
-                : t.statusReady}
-          </span>
-        </div>
-      </header>
+      {/* Drag region — pencere üst boşluğu, içeriksiz */}
+      <div className="window-drag" data-tauri-drag-region />
 
       {/* Offline Alert */}
       <AnimatePresence>
@@ -1908,48 +1909,10 @@ function App() {
         )}
       </AnimatePresence>
 
-      {/* Faz 5 — Lisans süresi yaklaşıyor uyarı banner'ı */}
-      <AnimatePresence>
-        {(() => {
-          const secs = licenseInfo?.secondsLeft ?? null;
-          if (secs == null || secs <= 0) return null;
-          const HOUR = 3600, DAY = 86400;
-          let level = null, label = '';
-          if (secs < HOUR) {
-            level = 'critical';
-            label = t.licenseRemainingMinutes(Math.ceil(secs / 60));
-          } else if (secs < DAY) {
-            level = 'warning';
-            label = t.licenseRemainingHours(Math.ceil(secs / HOUR));
-          } else if (secs < 7 * DAY) {
-            level = 'info';
-            label = t.licenseRemainingDays(Math.ceil(secs / DAY));
-          }
-          if (!level) return null;
-          return (
-            <motion.div
-              key={`exp-${level}`}
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className={`license-banner license-banner--${level}`}
-              onClick={() => {
-                localStorage.removeItem(LS_KEYS.license);
-                setExpiredInfo(licenseInfo);
-                setLicenseState('expired');
-              }}
-            >
-              <AlertTriangle size={14} />
-              <span><strong>{t.licenseExpiringTitle}</strong> · {label}</span>
-              <span className="license-banner-action">{t.licenseExpiringBtn} ›</span>
-            </motion.div>
-          );
-        })()}
-      </AnimatePresence>
-
       {/* Main Content */}
       <main className="main-content">
         <div className="shield-wrapper">
+          {isConnected && !isProcessing && <div className="shield-wave" aria-hidden="true" />}
           <div
             className={`shield-circle ${isConnected ? "connected" : isProcessing ? "processing" : ""}`}
           >
@@ -1976,43 +1939,46 @@ function App() {
                 ? t.descConnected
                 : t.descReady}
           </p>
-
-          <AnimatePresence>
-            {isConnected && (() => {
-              const tier = detectProfileTier(config);
-              const tierLabel = tier
-                ? (t[`profile${tier.charAt(0).toUpperCase()}${tier.slice(1)}Name`] || tier)
-                : (t.profileCustomLabel || 'Özel');
-              const dnsLabel = config.selectedDns && config.selectedDns !== 'system'
-                ? config.selectedDns.toUpperCase()
-                : null;
-              return (
-                <motion.div
-                  initial={{ opacity: 0, y: -5, height: 0 }}
-                  animate={{ opacity: 1, y: 0, height: "auto", marginTop: "12px" }}
-                  exit={{ opacity: 0, y: -5, height: 0, marginTop: 0 }}
-                  style={{ display: "flex", justifyContent: "center" }}
-                >
-                  <div className="status-summary">
-                    <span className="status-summary-item">
-                      <span className="status-summary-label">{t.summaryProfile || 'Profil'}</span>
-                      <span className="status-summary-value">{tierLabel}</span>
-                    </span>
-                    {dnsLabel && (
-                      <>
-                        <span className="status-summary-divider" />
-                        <span className="status-summary-item">
-                          <span className="status-summary-label">{t.summaryDns || 'DNS'}</span>
-                          <span className="status-summary-value">{dnsLabel}</span>
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </motion.div>
-              );
-            })()}
-          </AnimatePresence>
         </div>
+
+        <AnimatePresence>
+          {isConnected && !isProcessing && (() => {
+            const tier = detectProfileTier(config);
+            const tierLabel = tier
+              ? (t[`profile${tier.charAt(0).toUpperCase()}${tier.slice(1)}Name`] || tier)
+              : (t.profileCustomLabel || 'Özel');
+            const dnsLabel = config.selectedDns && config.selectedDns !== 'system'
+              ? config.selectedDns.toUpperCase()
+              : null;
+            return (
+              <motion.div
+                key="stats-stack"
+                className="stats-stack"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 6 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="status-summary">
+                  <span className="status-summary-item">
+                    <span className="status-summary-label">{t.summaryProfile || 'Profil'}</span>
+                    <span className="status-summary-value">{tierLabel}</span>
+                  </span>
+                  {dnsLabel && (
+                    <>
+                      <span className="status-summary-divider" />
+                      <span className="status-summary-item">
+                        <span className="status-summary-label">{t.summaryDns || 'DNS'}</span>
+                        <span className="status-summary-value">{dnsLabel}</span>
+                      </span>
+                    </>
+                  )}
+                </div>
+                <BypassGraph stats={bypassStats} t={t} visible />
+              </motion.div>
+            );
+          })()}
+        </AnimatePresence>
       </main>
 
       {/* Action Button */}
@@ -2039,24 +2005,28 @@ function App() {
           )}
         </AnimatePresence>
 
-        <button
-          className={`main-btn ${isConnected ? "disconnect" : "connect"} ${isProcessing ? "processing" : ""}`}
-          onClick={toggleConnection}
-          disabled={isProcessing || isRestartingDpi.current || isRestartingLan.current}
-        >
-          <Power size={22} strokeWidth={2.5} />
-          <span>
-            {isApplyingSettings
-              ? t.btnApplyingSettings
-              : isProcessing
-                ? isConnected
-                  ? t.btnDisconnecting
-                  : t.btnConnecting
-                : isConnected
-                  ? t.btnDisconnect
-                  : t.btnConnect}
-          </span>
-        </button>
+        {(() => {
+          const btnLabel = isApplyingSettings
+            ? t.btnApplyingSettings
+            : isProcessing
+              ? isConnected
+                ? t.btnDisconnecting
+                : t.btnConnecting
+              : isConnected
+                ? t.btnDisconnect
+                : t.btnConnect;
+          return (
+            <button
+              className={`main-btn icon-only ${isConnected ? "disconnect" : "connect"} ${isProcessing ? "processing" : ""}`}
+              onClick={toggleConnection}
+              disabled={isProcessing || isRestartingDpi.current || isRestartingLan.current}
+              aria-label={btnLabel}
+              title={btnLabel}
+            >
+              <Power size={26} strokeWidth={2.4} />
+            </button>
+          );
+        })()}
       </div>
 
       {/* Bottom Navigation — Çıkış tray ve onay diyaloğuna taşındı (Faz 1) */}
@@ -2720,6 +2690,7 @@ function App() {
           updateConfig={updateConfig}
           dnsLatencies={dnsLatencies}
           setDnsLatencies={setDnsLatencies}
+          ispDetection={ispDetection}
         />
       )}
     </div>

@@ -224,11 +224,14 @@ export function buildProxyEngineArgs({
   dohUrl,
 }) {
   const logs = [];
+  // PERF: 'info' seviyesi yoğun trafikte saniyede yalnızca 10-50 satır üretir.
+  // Bu seviye günlük kullanımda yaklaşık %1 CPU yükü oluşturur ve sayaç motoruna
+  // anlamlı bypass olaylarını besler. Debug seviyesi (saniyede 200-2000+ satır)
+  // kasıtlı olarak kullanıcı erişiminden kaldırıldı — kullanıcı CPU'sunu korumak içindir.
   const args = [
     '--clean',
     '--listen-addr', listenAddr,
     '--timeout', String(timeoutMs),
-    '--silent',
     '--log-level', 'info',
   ];
 

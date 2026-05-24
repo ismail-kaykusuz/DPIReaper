@@ -18,13 +18,9 @@ export { ConnectionProfilePicker };
  * Tüm sekme içerikleri `src/settings/Settings{App,Connection,Advanced}Tab.jsx` altındadır.
  * Bu bileşen yalnızca state + helper fonksiyonları yönetir.
  */
-const Settings = ({ onBack, config, updateConfig, dnsLatencies, setDnsLatencies }) => {
+const Settings = ({ onBack, config, updateConfig, dnsLatencies, setDnsLatencies, ispDetection = null }) => {
   const [activeTab, setActiveTab] = useState('connection');
   const scrollRef = useRef(null);
-
-  // Npcap durumu
-  const [driverInstalled, setDriverInstalled] = useState(false);
-  const [needsRestart, setNeedsRestart] = useState(false);
 
   // DNS state (App.jsx prop'undan)
   const latencies = dnsLatencies || {};
@@ -35,25 +31,19 @@ const Settings = ({ onBack, config, updateConfig, dnsLatencies, setDnsLatencies 
   // Otomatik başlatma
   const [autostartEnabled, setAutostartEnabled] = useState(false);
 
-  // Sorun giderme + Defender
+  // Sorun giderme
   const [fixStatus, setFixStatus] = useState('idle');
-  const [defenderExclusionMsg, setDefenderExclusionMsg] = useState(null);
 
   const lang = config.language || 'tr';
   const t = getTranslations(lang);
 
   const DNS_PROVIDERS = useMemo(() => [
-    { id: 'system',     name: t.dnsSystemDefault, desc: t.dnsSystemDefaultDesc, ip: null },
-    { id: 'cloudflare', name: 'Cloudflare',        desc: t.dnsCfDesc,       ip: '1.1.1.1' },
-    { id: 'adguard',    name: 'AdGuard',           desc: t.dnsAdguardDesc,  ip: '94.140.14.14' },
-    { id: 'google',     name: 'Google',            desc: t.dnsGoogleDesc,   ip: '8.8.8.8' },
-    { id: 'quad9',      name: 'Quad9',             desc: t.dnsQuad9Desc,    ip: '9.9.9.9' },
-    { id: 'opendns',    name: 'OpenDNS',           desc: t.dnsOpenDnsDesc,  ip: '208.67.222.222' },
+    { id: 'cloudflare', name: 'Cloudflare', desc: t.dnsCfDesc,       ip: '1.1.1.1' },
+    { id: 'adguard',    name: 'AdGuard',    desc: t.dnsAdguardDesc,  ip: '94.140.14.14' },
+    { id: 'google',     name: 'Google',     desc: t.dnsGoogleDesc,   ip: '8.8.8.8' },
+    { id: 'quad9',      name: 'Quad9',      desc: t.dnsQuad9Desc,    ip: '9.9.9.9' },
+    { id: 'opendns',    name: 'OpenDNS',    desc: t.dnsOpenDnsDesc,  ip: '208.67.222.222' },
   ], [t]);
-
-  useEffect(() => {
-    invoke('check_driver').then(setDriverInstalled).catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -61,10 +51,10 @@ const Settings = ({ onBack, config, updateConfig, dnsLatencies, setDnsLatencies 
 
   useEffect(() => {
     if (Object.keys(latencies).length > 0) {
-      const systemDns = DNS_PROVIDERS.find((p) => p.id === 'system');
-      const otherDns = DNS_PROVIDERS.filter((p) => p.id !== 'system')
-        .sort((a, b) => (latencies[a.id] || 999) - (latencies[b.id] || 999));
-      setSortedProviders(systemDns ? [systemDns, ...otherDns] : otherDns);
+      const sorted = [...DNS_PROVIDERS].sort(
+        (a, b) => (latencies[a.id] || 999) - (latencies[b.id] || 999)
+      );
+      setSortedProviders(sorted);
     } else {
       setSortedProviders(DNS_PROVIDERS);
     }
@@ -94,10 +84,9 @@ const Settings = ({ onBack, config, updateConfig, dnsLatencies, setDnsLatencies 
   const checkAllLatencies = async (forceSelectBest = false) => {
     setIsChecking(true);
     const newLatencies = {};
-    const pingableProviders = DNS_PROVIDERS.filter((p) => p.ip !== null);
 
     const results = await Promise.allSettled(
-      pingableProviders.map(async (provider) => {
+      DNS_PROVIDERS.map(async (provider) => {
         try {
           const latency = await invoke('check_dns_latency', { dnsIp: provider.ip });
           return { id: provider.id, latency };
@@ -114,13 +103,13 @@ const Settings = ({ onBack, config, updateConfig, dnsLatencies, setDnsLatencies 
 
     setLatencies(newLatencies);
 
-    const systemDns = DNS_PROVIDERS.find((p) => p.id === 'system');
-    const otherDns = DNS_PROVIDERS.filter((p) => p.id !== 'system')
-      .sort((a, b) => (newLatencies[a.id] || 999) - (newLatencies[b.id] || 999));
-    setSortedProviders(systemDns ? [systemDns, ...otherDns] : otherDns);
+    const sorted = [...DNS_PROVIDERS].sort(
+      (a, b) => (newLatencies[a.id] || 999) - (newLatencies[b.id] || 999)
+    );
+    setSortedProviders(sorted);
 
     if (forceSelectBest || config.dnsMode === 'auto') {
-      const bestDns = otherDns[0];
+      const bestDns = sorted[0];
       if (bestDns) updateConfig('selectedDns', bestDns.id);
     }
 
@@ -175,6 +164,7 @@ const Settings = ({ onBack, config, updateConfig, dnsLatencies, setDnsLatencies 
               latencies={latencies}
               isChecking={isChecking}
               checkAllLatencies={checkAllLatencies}
+              ispDetection={ispDetection}
             />
           )}
 
@@ -183,12 +173,6 @@ const Settings = ({ onBack, config, updateConfig, dnsLatencies, setDnsLatencies 
               config={config}
               updateConfig={updateConfig}
               t={t}
-              driverInstalled={driverInstalled}
-              setDriverInstalled={setDriverInstalled}
-              needsRestart={needsRestart}
-              setNeedsRestart={setNeedsRestart}
-              defenderExclusionMsg={defenderExclusionMsg}
-              setDefenderExclusionMsg={setDefenderExclusionMsg}
               fixStatus={fixStatus}
               handleFixInternet={handleFixInternet}
             />

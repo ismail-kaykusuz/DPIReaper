@@ -36,7 +36,7 @@ export const APP = {
 export const LS_KEYS = {
   config: "dpireaper_config",
   firstRun: "dpireaper_first_run_done",
-  license: "dpireaper_license_token",
+  defenderExclusionAdded: "dpireaper_defender_exclusion_added",
 };
 
 export const RETRY_DELAYS = [2500, 3000, 6000, 12000, 20000];

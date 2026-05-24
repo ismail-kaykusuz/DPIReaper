@@ -183,7 +183,7 @@ Ayarlar
 **Bağımlılık:** Faz 3  
 
 #### Kapsam
-- **Hakkında** ekranı: sürüm, lisans, GitHub / destek linki, gizlilik notu
+- **Hakkında** ekranı: sürüm, GitHub / destek linki, gizlilik notu
 - **Günlük** ekranı: filtre (Tümü / Bilgi / Uyarı / Hata), kopyala / temizle, renkli console yerine okunabilir liste
 - **Durum ve güven:** bağlıyken net durum çubuğu; hata mesajlarında eylem önerisi (ör. Defender dışlama)
 - **Kurulum deneyimi (isteğe bağlı):** ISS/profil → test bağlantısı → tamamlandı
@@ -213,7 +213,6 @@ Aşağıdakiler **bilinçli olarak** bu plana dahil edilmemiştir; ayrı talep g
 - Proxy motoru (SpoofDPI / Go) çekirdek algoritma değişiklikleri
 - Yeni ISS profili ekleme (içerik güncellemesi Faz 3 sonrası kolaylaşır)
 - macOS / Linux portu
-- Abonelik / lisans sunucusu entegrasyonu
 
 ---
 
