@@ -282,7 +282,7 @@ DPIReaper boş zamanda geliştirilir, ücretsiz, açık kaynak ve reklamsız kal
 ### Patreon
 
 <p>
-  <a href="https://www.patreon.com/cw/DPIReaper">
+  <a href="https://www.patreon.com/16093117/join">
     <img alt="Patreon" src="https://img.shields.io/badge/Patreon-DPIReaper-F96854?style=for-the-badge&logo=patreon&logoColor=white">
   </a>
 </p>
