@@ -1,21 +1,30 @@
 [[permission]]
-identifier = "allow-autostart"
-description = "Windows autostart registry and scheduled task commands"
+identifier = "allow-app-commands"
+description = "All DPIReaper custom invoke commands"
 commands.allow = [
+  "clear_system_proxy",
+  "set_system_proxy",
+  "update_tray_tooltip",
+  "check_admin",
+  "relaunch_as_admin",
+  "check_port_open",
+  "get_sidecar_config",
+  "start_pac_server",
+  "stop_pac_server",
+  "kill_zombie_sidecar",
+  "check_dns_latency",
+  "save_sidecar_pid",
+  "startup_proxy_cleanup",
+  "add_defender_exclusions",
+  "detect_isp",
+  "quit_app",
+  "is_autostarted",
   "is_autostart_registry_enabled",
   "set_autostart_enabled",
-]
-
-[[permission]]
-identifier = "allow-update-check"
-description = "Check GitHub Releases for application updates"
-commands.allow = [
   "check_for_app_update",
-]
-
-[[permission]]
-identifier = "allow-relaunch-admin"
-description = "Restart the application with administrator elevation"
-commands.allow = [
-  "relaunch_as_admin",
+  "check_sidecar_exists",
+  "check_proxy_health",
+  "list_network_interfaces",
+  "repair_internet_extended",
+  "apply_custom_bypass",
 ]

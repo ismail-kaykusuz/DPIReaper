@@ -5,9 +5,7 @@
   ],
   "permissions": [
     "core:default",
-    "allow-autostart",
-    "allow-update-check",
-    "allow-relaunch-admin",
+    "allow-app-commands",
     "core:window:allow-close",
     "core:window:allow-hide",
     "core:window:allow-show",
