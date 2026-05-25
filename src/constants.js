@@ -25,7 +25,7 @@ export const DOH_MAP = {
   opendns: "https://208.67.222.222/dns-query",
 };
 
-const APP_VERSION = "1.0.3";
+const APP_VERSION = "1.0.4";
 
 export const APP = {
   name: "DPIReaper",

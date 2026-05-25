@@ -441,7 +441,7 @@ Function InstallFinishLeave
   SendMessage $AutostartCheckbox ${BM_GETCHECK} 0 0 $AutostartCheckboxState
   ${If} $AutostartCheckboxState = ${BST_CHECKED}
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "DPIReaper" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\" --autostart"
-    WriteRegBin HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "DPIReaper" 03 00 00 00 00 00 00 00 00 00 00 00
+    WriteRegBin HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "DPIReaper" 02 00 00 00 00 00 00 00 00 00 00 00
   ${Else}
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "DPIReaper"
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "DPIReaper"

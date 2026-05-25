@@ -1,6 +1,6 @@
 [package]
 name = "dpireaper"
-version = "1.0.3"
+version = "1.0.4"
 description = "DPIReaper — local proxy and DPI bypass."
 authors = ["DPIReaper"]
 edition = "2021"

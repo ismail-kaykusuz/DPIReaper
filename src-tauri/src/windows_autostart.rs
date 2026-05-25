@@ -1,4 +1,4 @@
-//! Windows autostart: Run registry + StartupApproved (0x03) + logon scheduled task.
+//! Windows autostart: Run registry + StartupApproved (0x02 = enabled) + logon scheduled task.
 
 #[cfg(windows)]
 mod imp {
@@ -16,7 +16,8 @@ mod imp {
         r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
     const VALUE_NAME: &str = "DPIReaper";
     const TASK_NAME: &str = "DPIReaperAutostart";
-    const STARTUP_ENABLED: [u8; 12] = [0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    // Windows StartupApproved: byte0 LSB=0 enabled (0x02), LSB=1 disabled (0x03 + timestamp).
+    const STARTUP_ENABLED: [u8; 12] = [0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
     fn pref_path() -> Result<PathBuf, String> {
         let base = std::env::var_os("LOCALAPPDATA").ok_or("LOCALAPPDATA bulunamadi")?;
@@ -83,6 +84,22 @@ mod imp {
         run.set_value(VALUE_NAME, &run_command_for_exe(exe))
             .map_err(|e| format!("Run write: {}", e))?;
         Ok(())
+    }
+
+    fn startup_approved_is_enabled() -> Result<bool, String> {
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let key = match hkcu.open_subkey(STARTUP_APPROVED_KEY) {
+            Ok(k) => k,
+            Err(_) => return Ok(true),
+        };
+        let raw = match key.get_raw_value(VALUE_NAME) {
+            Ok(v) => v,
+            Err(_) => return Ok(true),
+        };
+        if raw.bytes.is_empty() {
+            return Ok(true);
+        }
+        Ok((raw.bytes[0] & 1) == 0)
     }
 
     fn write_startup_approved() -> Result<(), String> {
@@ -170,10 +187,11 @@ mod imp {
     }
 
     pub fn is_enabled() -> Result<bool, String> {
-        if let Some(pref) = read_pref() {
-            return Ok(pref);
+        let run_ok = run_registry_active()?;
+        if !run_ok {
+            return Ok(false);
         }
-        Ok(run_registry_active()? || task_exists())
+        startup_approved_is_enabled()
     }
 
     pub fn set_enabled(enabled: bool) -> Result<(), String> {
@@ -181,10 +199,11 @@ mod imp {
 
         if enabled {
             let exe = exe_path()?;
+            // StartupApproved once — Run eklenince Explorer varsayilan olarak disabled (0x03) yazabiliyor.
+            write_startup_approved()?;
             write_run_registry(&exe)?;
             write_startup_approved()?;
             if let Err(e) = create_scheduled_task(&exe) {
-                // Run + StartupApproved yeterli olabilir; task hatasini logla ama basarisiz sayma
                 eprintln!("[AUTOSTART] Task Scheduler uyarisi: {}", e);
             }
         } else {

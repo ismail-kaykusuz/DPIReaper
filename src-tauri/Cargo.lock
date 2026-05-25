@@ -909,7 +909,7 @@ dependencies = [
 
 [[package]]
 name = "dpireaper"
-version = "1.0.3"
+version = "1.0.4"
 dependencies = [
  "local-ip-address",
  "serde",
