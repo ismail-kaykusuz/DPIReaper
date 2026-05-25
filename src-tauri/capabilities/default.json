@@ -5,6 +5,8 @@
   ],
   "permissions": [
     "core:default",
+    "allow-autostart",
+    "allow-update-check",
     "core:window:allow-close",
     "core:window:allow-hide",
     "core:window:allow-show",

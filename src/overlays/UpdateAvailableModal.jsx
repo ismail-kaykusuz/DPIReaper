@@ -11,7 +11,7 @@ const UpdateAvailableModal = ({ open, t, version, onDownload, onLater }) => (
         exit={{ opacity: 0 }}
         className="modal-overlay"
         style={{
-          zIndex: 999998,
+          zIndex: 10000001,
           background: 'rgba(9, 9, 11, 0.65)',
           backdropFilter: 'blur(6px)',
         }}

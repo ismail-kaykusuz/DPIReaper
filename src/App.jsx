@@ -214,35 +214,28 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Autostart self-heal: native Run + StartupApproved (0x03) — Tauri plugin kaldırıldı.
+  // Autostart: config aciksa registry + task kaydini Rust tarafinda yenile.
   useEffect(() => {
     (async () => {
       try {
-        let registryOn = await invoke('is_autostart_registry_enabled');
         const raw = localStorage.getItem(LS_KEYS.config);
         const saved = raw ? JSON.parse(raw) : {};
-
-        if (registryOn && !saved.autoStart) {
-          const next = { ...saved, autoStart: true };
-          localStorage.setItem(LS_KEYS.config, JSON.stringify(next));
-          setConfig((prev) => ({ ...prev, autoStart: true }));
-          saved.autoStart = true;
-        }
-
         if (saved.autoStart === true) {
-          await invoke('set_autostart_enabled', { enabled: true });
-        } else if (registryOn) {
-          await invoke('set_autostart_enabled', { enabled: false });
+          const ok = await invoke('set_autostart_enabled', { enabled: true });
+          if (!ok) {
+            console.warn('Autostart re-apply returned false');
+          }
         }
       } catch (e) {
-        console.warn('Autostart self-heal:', e);
+        console.warn('Autostart sync:', e);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // GitHub Releases — yeni sürüm varsa kullanıcıya bildir (otomatik kurulum yok).
+  // GitHub Releases — ilk kurulum overlay kapandiktan sonra kontrol et.
   useEffect(() => {
+    if (showFirstRunISS) return undefined;
     let cancelled = false;
     (async () => {
       try {
@@ -257,7 +250,7 @@ function App() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [showFirstRunISS]);
 
   // Defender consent modal: onboarding tamamlanmış ve henüz karar verilmemişse göster
   useEffect(() => {

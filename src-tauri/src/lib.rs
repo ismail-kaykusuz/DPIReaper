@@ -2,6 +2,7 @@
 mod isp_detect;
 mod setup_page;
 mod windows_autostart;
+mod update_check;
 
 use local_ip_address::list_afinet_netifas;
 use std::io::Write;
@@ -1571,7 +1572,7 @@ pub fn run() {
     }
 
     #[cfg(windows)]
-    windows_autostart::heal_if_enabled();
+    windows_autostart::heal_on_startup();
 
     // P0-FIX: Single-instance enforcement — aynı anda sadece bir DPIReaper çalışabilir
     #[cfg(target_os = "windows")]
@@ -1750,6 +1751,7 @@ pub fn run() {
             is_autostarted,
             windows_autostart::is_autostart_registry_enabled,
             windows_autostart::set_autostart_enabled,
+            update_check::check_for_app_update,
             // BLOK 3 — C özellikleri
             check_sidecar_exists,
             check_proxy_health,

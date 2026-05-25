@@ -1,0 +1,14 @@
+[[permission]]
+identifier = "allow-autostart"
+description = "Windows autostart registry and scheduled task commands"
+commands.allow = [
+  "is_autostart_registry_enabled",
+  "set_autostart_enabled",
+]
+
+[[permission]]
+identifier = "allow-update-check"
+description = "Check GitHub Releases for application updates"
+commands.allow = [
+  "check_for_app_update",
+]

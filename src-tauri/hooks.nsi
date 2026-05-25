@@ -50,6 +50,10 @@ LangString dpireaperAutostartLabel ${LANG_ENGLISH} "Start DPIReaper when Windows
     Pop $0
 
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "DPIReaper"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "DPIReaper"
+
+    nsExec::ExecToStack 'schtasks /Delete /TN "DPIReaperAutostart" /F'
+    Pop $0
 
     nsExec::ExecToStack 'ipconfig /flushdns'
     Pop $0
