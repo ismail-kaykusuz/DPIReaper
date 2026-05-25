@@ -6,7 +6,6 @@ import UpdateAvailableModal from "./overlays/UpdateAvailableModal";
 import { createBypassStatsTracker } from "./bypassStats";
 import { detectProfileTier } from "./profiles";
 import { motion, AnimatePresence } from "framer-motion";
-import { enable as enableAutostart, disable as disableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Command, open as openShell } from "@tauri-apps/plugin-shell";
 import { invoke } from "@tauri-apps/api/core";
@@ -215,12 +214,11 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Autostart self-heal: Tauri Windows bug — registry kaydı silinebiliyor; config açıksa her açılışta yenile.
-  // Kurulum checkbox'ı registry'ye yazdıysa ilk açılışta config ile senkronize et.
+  // Autostart self-heal: native Run + StartupApproved (0x03) — Tauri plugin kaldırıldı.
   useEffect(() => {
     (async () => {
       try {
-        let registryOn = await isAutostartEnabled();
+        let registryOn = await invoke('is_autostart_registry_enabled');
         const raw = localStorage.getItem(LS_KEYS.config);
         const saved = raw ? JSON.parse(raw) : {};
 
@@ -232,9 +230,9 @@ function App() {
         }
 
         if (saved.autoStart === true) {
-          await enableAutostart();
+          await invoke('set_autostart_enabled', { enabled: true });
         } else if (registryOn) {
-          await disableAutostart();
+          await invoke('set_autostart_enabled', { enabled: false });
         }
       } catch (e) {
         console.warn('Autostart self-heal:', e);

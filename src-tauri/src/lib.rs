@@ -1,6 +1,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod isp_detect;
 mod setup_page;
+mod windows_autostart;
 
 use local_ip_address::list_afinet_netifas;
 use std::io::Write;
@@ -1562,6 +1563,16 @@ fn apply_custom_bypass(domains: Vec<String>, proxy_port: u16) -> Result<(), Stri
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Çalışma dizinini exe klasörüne al — Run registry ile boot'ta CWD System32 olabilir.
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            let _ = std::env::set_current_dir(parent);
+        }
+    }
+
+    #[cfg(windows)]
+    windows_autostart::heal_if_enabled();
+
     // P0-FIX: Single-instance enforcement — aynı anda sadece bir DPIReaper çalışabilir
     #[cfg(target_os = "windows")]
     {
@@ -1718,12 +1729,6 @@ pub fn run() {
             }
             Ok(())
         })
-        .plugin(
-            tauri_plugin_autostart::Builder::new()
-                .app_name("DPIReaper")
-                .args(["--autostart"])
-                .build(),
-        )
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![
@@ -1743,6 +1748,8 @@ pub fn run() {
             isp_detect::detect_isp,
             quit_app,
             is_autostarted,
+            windows_autostart::is_autostart_registry_enabled,
+            windows_autostart::set_autostart_enabled,
             // BLOK 3 — C özellikleri
             check_sidecar_exists,
             check_proxy_health,

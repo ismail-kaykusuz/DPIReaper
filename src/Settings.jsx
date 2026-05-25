@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Network, Wrench, SlidersHorizontal } from 'lucide-react';
-import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { invoke } from '@tauri-apps/api/core';
 import { getTranslations } from './i18n';
 import SettingsGeneralTab from './settings/SettingsGeneralTab';
@@ -75,7 +74,7 @@ const Settings = ({
   useEffect(() => {
     (async () => {
       try {
-        const active = await isEnabled();
+        const active = await invoke('is_autostart_registry_enabled');
         setAutostartEnabled(active);
         // Madde 1: Config ile gerçek Registry durumu uyumsuzsa config'i tetikle
         if (config.autoStart !== active) {
@@ -99,15 +98,13 @@ const Settings = ({
 
   const toggleAutostart = async (val) => {
     try {
-      if (val) await enable();
-      else await disable();
-      const verified = await isEnabled();
+      const verified = await invoke('set_autostart_enabled', { enabled: val });
       setAutostartEnabled(verified);
       updateConfig('autoStart', verified);
     } catch (e) {
       console.error('Autostart toggle failed:', e);
       try {
-        const fallback = await isEnabled();
+        const fallback = await invoke('is_autostart_registry_enabled');
         setAutostartEnabled(fallback);
         updateConfig('autoStart', fallback);
       } catch (_) { /* sessizce yut */ }
