@@ -9,11 +9,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ParzivaL3441/DPIReaper/releases/latest">
+  <a href="https://github.com/ismail-kaykusuz/DPIReaper/releases/latest">
     <img alt="İndir" src="https://img.shields.io/badge/%E2%AC%87%20%C4%B0ndir-DPIReaper-107C10?style=for-the-badge&logo=windows&logoColor=white">
   </a>
-  <a href="https://github.com/ParzivaL3441/DPIReaper/releases">
-    <img alt="Son Sürüm" src="https://img.shields.io/github/v/release/ParzivaL3441/DPIReaper?style=for-the-badge&label=S%C3%BCr%C3%BCm&logo=github&logoColor=white&color=0078D4">
+  <a href="https://github.com/ismail-kaykusuz/DPIReaper/releases">
+    <img alt="Son Sürüm" src="https://img.shields.io/github/v/release/ismail-kaykusuz/DPIReaper?style=for-the-badge&label=S%C3%BCr%C3%BCm&logo=github&logoColor=white&color=0078D4">
   </a>
   <a href="LICENSE">
     <img alt="Lisans" src="https://img.shields.io/badge/Lisans-MIT-yellow?style=for-the-badge">
@@ -33,7 +33,7 @@
 ## Tanıtım Videosu
 
 <p align="center">
-  <video src="https://github.com/ParzivaL3441/DPIReaper/raw/main/images/DPIReaperSetup-app-introduction.mp4" controls width="640"></video>
+  <video src="https://github.com/ismail-kaykusuz/DPIReaper/raw/main/images/DPIReaperSetup-app-introduction.mp4" controls width="640"></video>
 </p>
 
 > Oynatıcı yüklenmezse: [`images/DPIReaperSetup-app-introduction.mp4`](images/DPIReaperSetup-app-introduction.mp4)
@@ -189,7 +189,7 @@ Güvenlik vurguları:
 
 ## Kurulum
 
-1. [**Releases**](https://github.com/ParzivaL3441/DPIReaper/releases) sayfasına gidin.
+1. [**Releases**](https://github.com/ismail-kaykusuz/DPIReaper/releases) sayfasına gidin.
 2. İndirin:
    - `DPIReaper_1.0.0_x64-setup.exe` (NSIS — önerilen), veya
    - `DPIReaper_1.0.0_x64_en-US.msi` (Windows Installer).
@@ -224,7 +224,7 @@ Normal bağlantınıza geri dönmek için aynı düğmeye tekrar tıklayın — 
 Komutlar:
 
 ```powershell
-git clone https://github.com/ParzivaL3441/DPIReaper.git
+git clone https://github.com/ismail-kaykusuz/DPIReaper.git
 cd DPIReaper
 npm install
 

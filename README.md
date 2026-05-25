@@ -9,11 +9,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ParzivaL3441/DPIReaper/releases/latest">
+  <a href="https://github.com/ismail-kaykusuz/DPIReaper/releases/latest">
     <img alt="Download" src="https://img.shields.io/badge/%E2%AC%87%20Download-DPIReaper-107C10?style=for-the-badge&logo=windows&logoColor=white">
   </a>
-  <a href="https://github.com/ParzivaL3441/DPIReaper/releases">
-    <img alt="Latest Release" src="https://img.shields.io/github/v/release/ParzivaL3441/DPIReaper?style=for-the-badge&label=Latest&logo=github&logoColor=white&color=0078D4">
+  <a href="https://github.com/ismail-kaykusuz/DPIReaper/releases">
+    <img alt="Latest Release" src="https://img.shields.io/github/v/release/ismail-kaykusuz/DPIReaper?style=for-the-badge&label=Latest&logo=github&logoColor=white&color=0078D4">
   </a>
   <a href="LICENSE">
     <img alt="License" src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge">
@@ -33,7 +33,7 @@
 ## Demo
 
 <p align="center">
-  <video src="https://github.com/ParzivaL3441/DPIReaper/raw/main/images/DPIReaperSetup-app-introduction.mp4" controls width="640"></video>
+  <video src="https://github.com/ismail-kaykusuz/DPIReaper/raw/main/images/DPIReaperSetup-app-introduction.mp4" controls width="640"></video>
 </p>
 
 > If the embedded player does not load, watch it here:
@@ -190,7 +190,7 @@ Hardening highlights:
 
 ## Installation
 
-1. Go to the [**Releases**](https://github.com/ParzivaL3441/DPIReaper/releases) page.
+1. Go to the [**Releases**](https://github.com/ismail-kaykusuz/DPIReaper/releases) page.
 2. Download either:
    - `DPIReaper_1.0.0_x64-setup.exe` (NSIS installer — recommended), or
    - `DPIReaper_1.0.0_x64_en-US.msi` (Windows Installer).
@@ -225,7 +225,7 @@ Prerequisites:
 Commands:
 
 ```powershell
-git clone https://github.com/ParzivaL3441/DPIReaper.git
+git clone https://github.com/ismail-kaykusuz/DPIReaper.git
 cd DPIReaper
 npm install
 

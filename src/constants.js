@@ -3,7 +3,7 @@
 // ============================================================
 
 export const URLS = {
-  github: 'https://github.com/ParzivaL3441/DPIReaper',
+  github: 'https://github.com/ismail-kaykusuz/DPIReaper',
   discord: 'https://discord.gg/5jyWc3RSvk',
   patreon: 'https://www.patreon.com/cw/DPIReaper',
 };
