@@ -1,0 +1,68 @@
+name: Feature request
+description: Suggest an improvement or new capability
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the **problem**, not the implementation. DPIReaper intentionally
+        keeps its surface area small — requests that add complexity without a
+        clear user benefit may be declined.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What pain point are you trying to solve?
+      placeholder: When I try to ..., I cannot ... because ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: audience
+    attributes:
+      label: Who is affected?
+      description: e.g. home users on TurkTelekom, LAN-sharing households, advanced tinkerers
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you already tried, or why existing settings are not enough
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution (optional)
+      description: Your idea — we may choose a different approach
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Area
+      options:
+        - Connection / bypass engine
+        - LAN sharing / PAC setup page
+        - Settings / UI
+        - Localization
+        - Build / packaging
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and discussions for duplicates
+          required: true
+        - label: This request aligns with DPIReaper's scope as a local network tool (not a VPN or circumvention service)
+          required: true

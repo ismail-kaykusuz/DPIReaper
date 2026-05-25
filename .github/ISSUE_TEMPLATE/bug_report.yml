@@ -1,0 +1,91 @@
+name: Bug report
+description: Something is broken or not working as expected
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in every field —
+        reports without a clear reproduction path may be closed as `needs-info`.
+
+  - type: input
+    id: version
+    attributes:
+      label: DPIReaper version
+      description: From **Settings → About**
+      placeholder: e.g. 1.0.0
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Windows version
+      description: Include build number if you know it
+      placeholder: e.g. Windows 11 23H2 (22631.4317), x64
+    validations:
+      required: true
+
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Active connection profile
+      options:
+        - Recommended (default)
+        - Aggressive
+        - Conservative
+        - Custom / Advanced overrides
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered list from a clean launch
+      placeholder: |
+        1. Launch DPIReaper
+        2. Enable protection with profile X
+        3. Open browser and visit ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / diagnostics
+      description: Paste relevant lines from **Settings → Diagnostics → Open log folder**. Redact anything sensitive.
+      render: shell
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots / screen recording
+      description: Drag & drop images or paste links here
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and discussions before opening this report
+          required: true
+        - label: I am running the latest release from GitHub Releases
+          required: true
