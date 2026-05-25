@@ -39,6 +39,13 @@
 > If the embedded player does not load, watch it here:
 > [`images/DPIReaperSetup-app-introduction.mp4`](images/DPIReaperSetup-app-introduction.mp4)
 
+<p align="center">
+  <i>DPIReaper is free and will stay free. If it saves you time, a coffee on <b>Patreon</b> keeps the lights on — see <a href="#support-the-project">Support the Project</a> below.</i><br><br>
+  <a href="https://www.patreon.com/16093117/join">
+    <img alt="Become a Patron" src="https://img.shields.io/badge/Support%20on-Patreon-F96854?style=for-the-badge&logo=patreon&logoColor=white">
+  </a>
+</p>
+
 ---
 
 ## Table of Contents
@@ -52,10 +59,10 @@
 - [System Requirements](#system-requirements)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [Support the Project](#support-the-project)
 - [Build From Source](#build-from-source)
 - [Privacy &amp; Telemetry](#privacy--telemetry)
 - [Legal Notice &amp; Disclaimer](#legal-notice--disclaimer)
-- [Support the Project](#support-the-project)
 - [Credits](#credits)
 - [License](#license)
 
@@ -213,6 +220,40 @@ To temporarily revert to your normal connection, click the same button again —
 
 ---
 
+## Support the Project
+
+DPIReaper is developed in spare time and stays free, open-source, and ad-free. Nothing in the app is gated behind a paywall — these tiers are pure thank-yous. If DPIReaper helped you skip the late-night ISP debugging session, consider supporting the next release:
+
+### Patreon
+
+<p>
+  <a href="https://www.patreon.com/16093117/join">
+    <img alt="Patreon" src="https://img.shields.io/badge/Patreon-DPIReaper-F96854?style=for-the-badge&logo=patreon&logoColor=white">
+  </a>
+</p>
+
+### Crypto
+
+<table>
+<tr>
+  <td align="center" width="50%">
+    <b>BNB Smart Chain · BEP-20</b><br>
+    <img src="images/qrcode-BNB%20Smart%20Chain%20(BEP20).png" width="200" alt="BNB BEP20 QR"><br>
+    <code>0xc770595148f893cd9c29b810391c177d289819ae</code>
+  </td>
+  <td align="center" width="50%">
+    <b>Tron · TRC-20 (USDT only)</b><br>
+    <img src="images/qrcode-Tron%20(TRC20).png" width="200" alt="Tron TRC20 QR"><br>
+    <code>TKCCjWyzUNzbUhcPBiNm3g8TkUYA8FfvMA</code>
+  </td>
+</tr>
+</table>
+
+> [!WARNING]
+> On the Tron (TRC-20) address above, **send USDT only**. Sending any other coin or token will result in permanent loss.
+
+---
+
 ## Build From Source
 
 Prerequisites:
@@ -273,40 +314,6 @@ DPIReaper is provided **“AS IS”, without warranty of any kind**, as permitte
 7. **Open source.** The full source code is available in this repository under the MIT License. You are free to audit, fork, and self-build any release.
 
 By downloading, installing, or running DPIReaper, **you acknowledge that you have read and accepted this disclaimer in full**.
-
----
-
-## Support the Project
-
-DPIReaper is developed in spare time and stays free, open-source, and ad-free. If it helps you, please consider supporting development:
-
-### Patreon
-
-<p>
-  <a href="https://www.patreon.com/16093117/join">
-    <img alt="Patreon" src="https://img.shields.io/badge/Patreon-DPIReaper-F96854?style=for-the-badge&logo=patreon&logoColor=white">
-  </a>
-</p>
-
-### Crypto
-
-<table>
-<tr>
-  <td align="center" width="50%">
-    <b>BNB Smart Chain · BEP-20</b><br>
-    <img src="images/qrcode-BNB%20Smart%20Chain%20(BEP20).png" width="200" alt="BNB BEP20 QR"><br>
-    <code>0xc770595148f893cd9c29b810391c177d289819ae</code>
-  </td>
-  <td align="center" width="50%">
-    <b>Tron · TRC-20 (USDT only)</b><br>
-    <img src="images/qrcode-Tron%20(TRC20).png" width="200" alt="Tron TRC20 QR"><br>
-    <code>TKCCjWyzUNzbUhcPBiNm3g8TkUYA8FfvMA</code>
-  </td>
-</tr>
-</table>
-
-> [!WARNING]
-> On the Tron (TRC-20) address above, **send USDT only**. Sending any other coin or token will result in permanent loss.
 
 ---
 

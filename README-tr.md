@@ -38,6 +38,13 @@
 
 > Oynatıcı yüklenmezse: [`images/DPIReaperSetup-app-introduction.mp4`](images/DPIReaperSetup-app-introduction.mp4)
 
+<p align="center">
+  <i>DPIReaper ücretsiz ve öyle kalacak. Faydasını gördüyseniz <b>Patreon</b>'da bir kahve geliştirmeyi yaşatır — detay için aşağıdaki <a href="#projeyi-destekle">Projeyi Destekle</a>.</i><br><br>
+  <a href="https://www.patreon.com/16093117/join">
+    <img alt="Patreon'da Destek Ol" src="https://img.shields.io/badge/Destek%20Ol-Patreon-F96854?style=for-the-badge&logo=patreon&logoColor=white">
+  </a>
+</p>
+
 ---
 
 ## İçindekiler
@@ -51,10 +58,10 @@
 - [Sistem Gereksinimleri](#sistem-gereksinimleri)
 - [Kurulum](#kurulum)
 - [Hızlı Başlangıç](#hızlı-başlangıç)
+- [Projeyi Destekle](#projeyi-destekle)
 - [Kaynak Koddan Derleme](#kaynak-koddan-derleme)
 - [Gizlilik ve Telemetri](#gizlilik-ve-telemetri)
 - [Yasal Bildirim](#yasal-bildirim)
-- [Projeyi Destekle](#projeyi-destekle)
 - [Teşekkürler](#teşekkürler)
 - [Lisans](#lisans)
 
@@ -212,6 +219,40 @@ Normal bağlantınıza geri dönmek için aynı düğmeye tekrar tıklayın — 
 
 ---
 
+## Projeyi Destekle
+
+DPIReaper boş zamanda geliştirilir; ücretsiz, açık kaynak ve reklamsız kalmıştır. Uygulamada hiçbir özellik ödeme duvarının arkasında değildir — bu kademeler tamamen birer teşekkürdür. DPIReaper sayenize bir ISS borç gecesi yaşamadıysanız bir sonraki sürüme destek olabilirsiniz:
+
+### Patreon
+
+<p>
+  <a href="https://www.patreon.com/16093117/join">
+    <img alt="Patreon" src="https://img.shields.io/badge/Patreon-DPIReaper-F96854?style=for-the-badge&logo=patreon&logoColor=white">
+  </a>
+</p>
+
+### Kripto
+
+<table>
+<tr>
+  <td align="center" width="50%">
+    <b>BNB Smart Chain · BEP-20</b><br>
+    <img src="images/qrcode-BNB%20Smart%20Chain%20(BEP20).png" width="200" alt="BNB BEP20 QR"><br>
+    <code>0xc770595148f893cd9c29b810391c177d289819ae</code>
+  </td>
+  <td align="center" width="50%">
+    <b>Tron · TRC-20 (yalnızca USDT)</b><br>
+    <img src="images/qrcode-Tron%20(TRC20).png" width="200" alt="Tron TRC20 QR"><br>
+    <code>TKCCjWyzUNzbUhcPBiNm3g8TkUYA8FfvMA</code>
+  </td>
+</tr>
+</table>
+
+> [!WARNING]
+> Tron (TRC-20) adresine **yalnızca USDT** gönderin. Başka bir coin/token göndermek kalıcı kayba neden olur.
+
+---
+
 ## Kaynak Koddan Derleme
 
 Önkoşullar:
@@ -272,40 +313,6 @@ DPIReaper, MIT lisansı altında **"OLDUĞU GİBİ", hiçbir garanti verilmeksiz
 7. **Açık kaynak.** Kaynak kodun tamamı bu depoda MIT lisansıyla erişilebilir; her release'i denetleyebilir, fork'layabilir ve kendiniz derleyebilirsiniz.
 
 DPIReaper'ı indirerek, kurarak veya çalıştırarak **bu bildirimi tamamen okumuş ve kabul etmiş sayılırsınız**.
-
----
-
-## Projeyi Destekle
-
-DPIReaper boş zamanda geliştirilir, ücretsiz, açık kaynak ve reklamsız kalmıştır. Faydasını gördüyseniz desteklemeyi düşünebilirsiniz:
-
-### Patreon
-
-<p>
-  <a href="https://www.patreon.com/16093117/join">
-    <img alt="Patreon" src="https://img.shields.io/badge/Patreon-DPIReaper-F96854?style=for-the-badge&logo=patreon&logoColor=white">
-  </a>
-</p>
-
-### Kripto
-
-<table>
-<tr>
-  <td align="center" width="50%">
-    <b>BNB Smart Chain · BEP-20</b><br>
-    <img src="images/qrcode-BNB%20Smart%20Chain%20(BEP20).png" width="200" alt="BNB BEP20 QR"><br>
-    <code>0xc770595148f893cd9c29b810391c177d289819ae</code>
-  </td>
-  <td align="center" width="50%">
-    <b>Tron · TRC-20 (yalnızca USDT)</b><br>
-    <img src="images/qrcode-Tron%20(TRC20).png" width="200" alt="Tron TRC20 QR"><br>
-    <code>TKCCjWyzUNzbUhcPBiNm3g8TkUYA8FfvMA</code>
-  </td>
-</tr>
-</table>
-
-> [!WARNING]
-> Tron (TRC-20) adresine **yalnızca USDT** gönderin. Başka bir coin/token göndermek kalıcı kayba neden olur.
 
 ---
 
