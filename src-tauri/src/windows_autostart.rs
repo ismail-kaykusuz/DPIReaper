@@ -1,4 +1,5 @@
-//! Windows autostart: Task Scheduler (primary) + Run registry (Settings UI) + StartupApproved.
+//! Windows autostart: elevated Task Scheduler at logon (primary). Run registry is NOT used for
+//! launch — it starts a non-elevated process that breaks DPI bypass (admin required).
 
 #[cfg(windows)]
 mod imp {
@@ -18,8 +19,6 @@ mod imp {
         r"Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers";
     const VALUE_NAME: &str = "DPIReaper";
     const TASK_NAME: &str = "DPIReaperAutostart";
-    // Windows StartupApproved: byte0 LSB=0 enabled (0x02), LSB=1 disabled (0x03 + timestamp).
-    const STARTUP_ENABLED: [u8; 12] = [0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     const LOGON_DELAY: &str = "PT45S";
 
     fn pref_path() -> Result<PathBuf, String> {
@@ -56,72 +55,6 @@ mod imp {
         std::env::current_exe().map_err(|e| e.to_string())
     }
 
-    fn run_command_for_exe(exe: &Path) -> String {
-        format!("\"{}\" --autostart", exe.display())
-    }
-
-    fn run_value_points_to_us(val: &str, exe: &Path) -> bool {
-        let val_norm = normalize_path(val);
-        let exe_norm = normalize_path(&exe.to_string_lossy());
-        val_norm.contains(&exe_norm) && val_norm.contains("--autostart")
-    }
-
-    fn run_registry_active() -> Result<bool, String> {
-        let exe = exe_path()?;
-        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        let key = hkcu
-            .open_subkey(RUN_KEY)
-            .map_err(|e| format!("Run key: {}", e))?;
-        let val: String = match key.get_value(VALUE_NAME) {
-            Ok(v) => v,
-            Err(_) => return Ok(false),
-        };
-        Ok(run_value_points_to_us(&val, &exe))
-    }
-
-    fn write_run_registry(exe: &Path) -> Result<(), String> {
-        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        let (run, _) = hkcu
-            .create_subkey(RUN_KEY)
-            .map_err(|e| format!("Run create: {}", e))?;
-        run.set_value(VALUE_NAME, &run_command_for_exe(exe))
-            .map_err(|e| format!("Run write: {}", e))?;
-        Ok(())
-    }
-
-    fn startup_approved_is_enabled() -> Result<bool, String> {
-        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        let key = match hkcu.open_subkey(STARTUP_APPROVED_KEY) {
-            Ok(k) => k,
-            Err(_) => return Ok(true),
-        };
-        let raw = match key.get_raw_value(VALUE_NAME) {
-            Ok(v) => v,
-            Err(_) => return Ok(true),
-        };
-        if raw.bytes.is_empty() {
-            return Ok(true);
-        }
-        Ok((raw.bytes[0] & 1) == 0)
-    }
-
-    fn write_startup_approved() -> Result<(), String> {
-        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        let (approved, _) = hkcu
-            .create_subkey(STARTUP_APPROVED_KEY)
-            .map_err(|e| format!("StartupApproved create: {}", e))?;
-        approved
-            .set_raw_value(
-                VALUE_NAME,
-                &winreg::RegValue {
-                    bytes: STARTUP_ENABLED.to_vec(),
-                    vtype: REG_BINARY,
-                },
-            )
-            .map_err(|e| format!("StartupApproved write: {}", e))?;
-        Ok(())
-    }
-
     fn delete_run_registry() {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         if let Ok(key) = hkcu.open_subkey(RUN_KEY) {
@@ -132,15 +65,14 @@ mod imp {
         }
     }
 
-    /// "Run as administrator" uyumluluk bayragi startup'ta UAC istemeden calismayi engeller (0x800702E4).
-    fn clear_run_as_admin_shims(_exe: &Path) {
+    /// RUNASADMIN shim: startup Run key ile birlikte kullanilinca sessiz basarisizlik (0x800702E4).
+    fn clear_run_as_admin_shims() {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let Ok(key) = hkcu.open_subkey(APP_COMPAT_LAYERS) else {
             return;
         };
 
         let mut removed = Vec::new();
-
         for entry in key.enum_values().filter_map(|e| e.ok()) {
             let name = entry.0;
             if !normalize_path(&name).contains("dpireaper.exe") {
@@ -157,7 +89,7 @@ mod imp {
 
         if !removed.is_empty() {
             eprintln!(
-                "[AUTOSTART] RUNASADMIN uyumluluk bayragi kaldirildi (startup engeli): {:?}",
+                "[AUTOSTART] RUNASADMIN uyumluluk bayragi kaldirildi: {:?}",
                 removed
             );
         }
@@ -198,13 +130,15 @@ mod imp {
         let work_dir = exe
             .parent()
             .map(|p| xml_escape(&p.display().to_string()))
-            .unwrap_or_else(|| xml_escape(&exe.display().to_string()));
+            .unwrap_or_else(|| exe_str.clone());
 
+        // HighestAvailable: logon'da yonetici hakki (UAC'siz, admin grubu kullanicilar icin).
+        // Run registry kullanilmiyor — non-elevated instance bypass'i bozuyordu.
         let xml = format!(
             r#"<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>DPIReaper autostart at user logon</Description>
+    <Description>DPIReaper autostart at user logon (elevated)</Description>
   </RegistrationInfo>
   <Triggers>
     <LogonTrigger>
@@ -215,7 +149,7 @@ mod imp {
   <Principals>
     <Principal id="Author">
       <LogonType>InteractiveToken</LogonType>
-      <RunLevel>LeastPrivilege</RunLevel>
+      <RunLevel>HighestAvailable</RunLevel>
     </Principal>
   </Principals>
   <Settings>
@@ -243,7 +177,14 @@ mod imp {
         write_utf16_xml(&xml_path, &xml)?;
 
         let output = Command::new("schtasks")
-            .args(["/Create", "/TN", TASK_NAME, "/XML", &xml_path.to_string_lossy(), "/F"])
+            .args([
+                "/Create",
+                "/TN",
+                TASK_NAME,
+                "/XML",
+                &xml_path.to_string_lossy(),
+                "/F",
+            ])
             .creation_flags(CREATE_NO_WINDOW)
             .output()
             .map_err(|e| format!("schtasks create: {}", e))?;
@@ -276,25 +217,21 @@ mod imp {
     }
 
     pub fn is_enabled() -> Result<bool, String> {
-        let run_ok = run_registry_active()?;
-        if !run_ok {
-            return Ok(false);
-        }
-        startup_approved_is_enabled()
+        read_pref().map_or_else(
+            || Ok(task_exists()),
+            |pref| Ok(pref && task_exists()),
+        )
     }
 
     pub fn set_enabled(enabled: bool) -> Result<(), String> {
         write_pref(enabled)?;
+        clear_run_as_admin_shims();
 
         if enabled {
             let exe = exe_path()?;
-            clear_run_as_admin_shims(&exe);
-            write_startup_approved()?;
-            write_run_registry(&exe)?;
-            write_startup_approved()?;
-            if let Err(e) = create_scheduled_task(&exe) {
-                eprintln!("[AUTOSTART] Task Scheduler uyarisi: {}", e);
-            }
+            // Eski Run kaydini kaldir — non-elevated boot connect'i bozar.
+            delete_run_registry();
+            create_scheduled_task(&exe)?;
         } else {
             delete_run_registry();
             delete_scheduled_task();
@@ -303,18 +240,18 @@ mod imp {
     }
 
     pub fn heal_on_startup() {
-        let exe = match exe_path() {
-            Ok(p) => p,
-            Err(_) => return,
-        };
-        clear_run_as_admin_shims(&exe);
+        clear_run_as_admin_shims();
 
         let want = match read_pref() {
             Some(v) => v,
-            None => run_registry_active().unwrap_or(false) || task_exists(),
+            None => task_exists(),
         };
+
         if want {
             let _ = set_enabled(true);
+        } else {
+            // Gecis: eski surumlerden kalan Run kaydini temizle
+            delete_run_registry();
         }
     }
 }

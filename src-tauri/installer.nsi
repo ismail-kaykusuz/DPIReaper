@@ -440,13 +440,17 @@ Function InstallFinishLeave
 
   SendMessage $AutostartCheckbox ${BM_GETCHECK} 0 0 $AutostartCheckboxState
   ${If} $AutostartCheckboxState = ${BST_CHECKED}
-    ; RUNASADMIN uyumluluk bayragi startup'ta sessiz basarisizlik yapar — kaldir.
     DeleteRegValue HKCU "Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers" "$INSTDIR\${MAINBINARYNAME}.exe"
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "DPIReaper" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\" --autostart"
-    WriteRegBin HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "DPIReaper" 02 00 00 00 00 00 00 00 00 00 00 00
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "DPIReaper"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "DPIReaper"
+    CreateDirectory "$LOCALAPPDATA\DPIReaper"
+    FileOpen $0 "$LOCALAPPDATA\DPIReaper\autostart.pref" w
+    FileWrite $0 "1"
+    FileClose $0
   ${Else}
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "DPIReaper"
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "DPIReaper"
+    Delete "$LOCALAPPDATA\DPIReaper\autostart.pref"
   ${EndIf}
 FunctionEnd
 

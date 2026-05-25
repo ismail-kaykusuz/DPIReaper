@@ -202,15 +202,23 @@ function App() {
   }, []);
 
   // Madde 1: --autostart ile başlatıldıysa pencereyi tray'e gizle.
-  // Kullanıcı `startHidden` ayarını kapatırsa pencere normal şekilde görünür.
+  // Non-elevated autostart bypass'i bozar — yönetici olarak yeniden başlat.
   useEffect(() => {
-    invoke('is_autostarted').then((auto) => {
-      if (!auto) return;
-      if (configRef.current?.startHidden === false) return;
+    (async () => {
       try {
+        const auto = await invoke('is_autostarted');
+        if (!auto) return;
+        const admin = await invoke('check_admin');
+        if (!admin) {
+          await invoke('relaunch_as_admin');
+          return;
+        }
+        if (configRef.current?.startHidden === false) return;
         getCurrentWindow().hide().catch(() => {});
-      } catch (_) { /* sessizce yut */ }
-    }).catch(() => {});
+      } catch (e) {
+        console.warn('Autostart elevation:', e);
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -762,7 +770,11 @@ function App() {
   };
 
   const startEngine = async (ignoredPort, portRetryCount = 0) => {
-    // P2-FIX: Asynchronous execution lock -> Aynı anda iki instance spawn edilmesini önler
+    // Takili kilit / olü sidecar referansini temizle
+    if (isStartingEngine.current && !childProcess.current) {
+      isStartingEngine.current = false;
+    }
+
     if (isStartingEngine.current || childProcess.current) return;
     isStartingEngine.current = true;
 
@@ -1270,9 +1282,18 @@ function App() {
       setIsProcessing(false);
       updateTrayTooltip("disconnected"); // ✅ Manuel durdurma
     } else {
-      // ✅ Kullanıcı manuel bağlanıyor - retry counter sıfırla
       retryCount.current = 0;
       userIntentDisconnect.current = false;
+
+      if (!isAdmin) {
+        try {
+          await invoke('relaunch_as_admin');
+        } catch (e) {
+          addLog(t.logSolAdmin, 'error', { i18nKey: 'logSolAdmin' });
+          console.error('Elevation failed:', e);
+        }
+        return;
+      }
 
       setIsProcessing(true);
       startEngine(8080);
@@ -1429,7 +1450,8 @@ function App() {
         // P1-FIX: Auto-Connect Race Condition çözümü (Temizlik adımları tamamlandıktan SONRA bağlan)
         // ✅ İlk giriş overlay'ı açıksa auto-connect yapma — kullanıcı ISS seçsin önce
         const isFirstRun = !localStorage.getItem(LS_KEYS.firstRun);
-        if (configRef.current.autoConnect && !childProcess.current && !isFirstRun) {
+        const adminOk = await invoke('check_admin').catch(() => false);
+        if (configRef.current.autoConnect && adminOk && !childProcess.current && !isFirstRun) {
           setIsProcessing(true);
           startEngine(8080);
         }
@@ -1943,6 +1965,31 @@ function App() {
                   width: "100%",
                 }}
               >
+                <button
+                  style={{
+                    background: "var(--accent-primary, #6366f1)",
+                    color: "white",
+                    padding: "0.8rem 2rem",
+                    border: "none",
+                    borderRadius: "10px",
+                    fontSize: "0.95rem",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    width: "100%",
+                    transition: "opacity 0.2s",
+                  }}
+                  onMouseEnter={(e) => (e.target.style.opacity = "0.9")}
+                  onMouseLeave={(e) => (e.target.style.opacity = "1")}
+                  onClick={async () => {
+                    try {
+                      await invoke("relaunch_as_admin");
+                    } catch (e) {
+                      console.error("Relaunch as admin failed:", e);
+                    }
+                  }}
+                >
+                  {t.adminRelaunch}
+                </button>
                 <button
                   style={{
                     background: "#ef4444",

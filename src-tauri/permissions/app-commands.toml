@@ -12,3 +12,10 @@ description = "Check GitHub Releases for application updates"
 commands.allow = [
   "check_for_app_update",
 ]
+
+[[permission]]
+identifier = "allow-relaunch-admin"
+description = "Restart the application with administrator elevation"
+commands.allow = [
+  "relaunch_as_admin",
+]

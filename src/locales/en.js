@@ -43,6 +43,7 @@ const en = {
   adminTitle: 'Administrator Required',
   adminDesc: 'DPIReaper needs to run as administrator to work correctly.',
   adminStep: 'Right-click the app → Select <strong>"Run as administrator"</strong>',
+  adminRelaunch: 'Restart as administrator',
   adminClose: 'CLOSE',
 
   noInternetTitle: 'No Internet Connection',

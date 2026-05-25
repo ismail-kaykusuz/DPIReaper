@@ -43,6 +43,7 @@ const tr = {
   adminTitle: 'Yönetici İzni Gerekli',
   adminDesc: 'DPIReaper\'ın düzgün çalışması için yönetici olarak çalıştırılması gereklidir.',
   adminStep: 'Uygulamaya sağ tıklayın → <strong>"Yönetici olarak çalıştır"</strong> seçin',
+  adminRelaunch: 'Yönetici olarak yeniden başlat',
   adminClose: 'KAPAT',
 
   noInternetTitle: 'İnternet Bağlantısı Yok',

@@ -1080,6 +1080,87 @@ fn check_port_open(port: u16) -> bool {
     .is_ok()
 }
 
+/// UAC ile yönetici olarak yeniden başlat (startup non-elevated veya manuel launch için).
+#[tauri::command]
+fn relaunch_as_admin() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        if check_admin() {
+            return Ok(());
+        }
+
+        use std::ffi::OsStr;
+        use std::os::windows::ffi::OsStrExt;
+        use std::ptr::null_mut;
+        use winapi::um::shellapi::ShellExecuteW;
+        use winapi::um::winuser::SW_SHOW;
+
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let exe_wide: Vec<u16> = exe
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+
+        let args: String = std::env::args().skip(1).collect::<Vec<_>>().join(" ");
+        let args_wide: Vec<u16> = if args.is_empty() {
+            vec![0]
+        } else {
+            OsStr::new(&args)
+                .encode_wide()
+                .chain(std::iter::once(0))
+                .collect()
+        };
+
+        let verb: Vec<u16> = OsStr::new("runas")
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+
+        let work_dir = exe
+            .parent()
+            .map(|p| {
+                p.as_os_str()
+                    .encode_wide()
+                    .chain(std::iter::once(0))
+                    .collect::<Vec<u16>>()
+            })
+            .unwrap_or_default();
+
+        unsafe {
+            let result = ShellExecuteW(
+                null_mut(),
+                verb.as_ptr(),
+                exe_wide.as_ptr(),
+                if args.is_empty() {
+                    null_mut()
+                } else {
+                    args_wide.as_ptr()
+                },
+                if work_dir.is_empty() {
+                    null_mut()
+                } else {
+                    work_dir.as_ptr()
+                },
+                SW_SHOW,
+            );
+            if result as isize <= 32 {
+                return Err(format!(
+                    "Yonetici olarak baslatilamadi (kod: {})",
+                    result as isize
+                ));
+            }
+        }
+
+        std::process::exit(0);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Yalnizca Windows desteklenir.".to_string())
+    }
+}
+
 #[tauri::command]
 fn check_admin() -> bool {
     #[cfg(target_os = "windows")]
@@ -1737,6 +1818,7 @@ pub fn run() {
             set_system_proxy,
             update_tray_tooltip,
             check_admin,
+            relaunch_as_admin,
             check_port_open,
             get_sidecar_config,
             start_pac_server,
