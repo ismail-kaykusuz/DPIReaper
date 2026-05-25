@@ -2,16 +2,18 @@ import Settings, { ConnectionProfilePicker } from "./Settings";
 import BypassGraph from "./components/BypassGraph";
 import DefenderConsentModal from "./overlays/DefenderConsentModal";
 import LanguagePicker from "./overlays/LanguagePicker";
+import UpdateAvailableModal from "./overlays/UpdateAvailableModal";
 import { createBypassStatsTracker } from "./bypassStats";
 import { detectProfileTier } from "./profiles";
 import { motion, AnimatePresence } from "framer-motion";
-// autostart importları Settings.jsx'te kullanılıyor, burada gerek yok
+import { enable as enableAutostart, disable as disableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Command, open as openShell } from "@tauri-apps/plugin-shell";
 import { invoke } from "@tauri-apps/api/core";
 import { getTranslations, detectSystemLang } from "./i18n";
 import { DNS_MAP, DOH_MAP, APP, RETRY_DELAYS, DPI_TIMEOUTS, LS_KEYS, URLS } from "./constants";
 import { buildProxyEngineArgs } from "./profiles";
+import { checkForAppUpdate } from "./utils/checkUpdate";
 
 // Re-add missing imports
 import DOMPurify from "dompurify";
@@ -75,6 +77,8 @@ function App() {
     localStorage.getItem(LS_KEYS.defenderExclusionDecision)
   );
   const [showDefenderConsent, setShowDefenderConsent] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [bypassStats, setBypassStats] = useState(null);
   // C5: Sidecar sağlık durumu — { ok: bool, latencyMs: number } | null
   const [healthStatus, setHealthStatus] = useState(null);
@@ -209,6 +213,52 @@ function App() {
       } catch (_) { /* sessizce yut */ }
     }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Autostart self-heal: Tauri Windows bug — registry kaydı silinebiliyor; config açıksa her açılışta yenile.
+  // Kurulum checkbox'ı registry'ye yazdıysa ilk açılışta config ile senkronize et.
+  useEffect(() => {
+    (async () => {
+      try {
+        let registryOn = await isAutostartEnabled();
+        const raw = localStorage.getItem(LS_KEYS.config);
+        const saved = raw ? JSON.parse(raw) : {};
+
+        if (registryOn && !saved.autoStart) {
+          const next = { ...saved, autoStart: true };
+          localStorage.setItem(LS_KEYS.config, JSON.stringify(next));
+          setConfig((prev) => ({ ...prev, autoStart: true }));
+          saved.autoStart = true;
+        }
+
+        if (saved.autoStart === true) {
+          await enableAutostart();
+        } else if (registryOn) {
+          await disableAutostart();
+        }
+      } catch (e) {
+        console.warn('Autostart self-heal:', e);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // GitHub Releases — yeni sürüm varsa kullanıcıya bildir (otomatik kurulum yok).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const info = await checkForAppUpdate(APP.version);
+        if (cancelled || !info) return;
+        const dismissed = localStorage.getItem(LS_KEYS.dismissedUpdateVersion);
+        if (dismissed === info.version) return;
+        setUpdateInfo(info);
+        setShowUpdateModal(true);
+      } catch (e) {
+        console.warn('Update check:', e);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // Defender consent modal: onboarding tamamlanmış ve henüz karar verilmemişse göster
@@ -2599,8 +2649,25 @@ function App() {
           currentPort={currentPort}
           defenderDecision={defenderDecision}
           requestDefenderExclusion={requestDefenderExclusion}
+          onAutostartError={(msg) => addLog(msg, 'warn', { i18nKey: 'autostartEnableFailed' })}
         />
       )}
+
+      <UpdateAvailableModal
+        open={showUpdateModal && !!updateInfo}
+        t={t}
+        version={updateInfo?.version}
+        onDownload={() => {
+          if (updateInfo?.url) openShell(updateInfo.url);
+          setShowUpdateModal(false);
+        }}
+        onLater={() => {
+          if (updateInfo?.version) {
+            localStorage.setItem(LS_KEYS.dismissedUpdateVersion, updateInfo.version);
+          }
+          setShowUpdateModal(false);
+        }}
+      />
 
       <DefenderConsentModal
         open={showDefenderConsent}

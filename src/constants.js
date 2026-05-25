@@ -48,6 +48,8 @@ export const LS_KEYS = {
   ispCache: "dpireaper_isp_cache",
   onboardingDone: "dpireaper_onboarding_done",
   lang: "dpireaper_lang",
+  /** Kullanıcının "Sonra" dediği sürüm — aynı sürüm için tekrar gösterme */
+  dismissedUpdateVersion: "dpireaper_dismissed_update_version",
 };
 
 export const RETRY_DELAYS = [2500, 3000, 6000, 12000, 20000];

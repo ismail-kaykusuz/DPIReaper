@@ -67,6 +67,8 @@ Var UpdateMode
 Var NoShortcutMode
 Var WixMode
 Var OldMainBinaryName
+Var AutostartCheckbox
+Var AutostartCheckboxState
 
 Name "${PRODUCTNAME}"
 BrandingText "${COPYRIGHT}"
@@ -391,6 +393,8 @@ Var AppStartMenuFolder
 ; Show run app after installation.
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_FUNCTION RunMainBinary
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW InstallFinishShow
+!define MUI_PAGE_CUSTOMFUNCTION_LEAVE InstallFinishLeave
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 !insertmacro MUI_PAGE_FINISH
 

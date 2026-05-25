@@ -29,6 +29,7 @@ const Settings = ({
   currentPort = 0,
   defenderDecision = null,
   requestDefenderExclusion = async () => false,
+  onAutostartError = null,
 }) => {
   const [activeTab, setActiveTab] = useState('connection');
   const scrollRef = useRef(null);
@@ -100,17 +101,17 @@ const Settings = ({
     try {
       if (val) await enable();
       else await disable();
-      // Madde 1: enable()/disable() sonrası gerçek Registry durumunu okuyup teyit et
       const verified = await isEnabled();
       setAutostartEnabled(verified);
       updateConfig('autoStart', verified);
     } catch (e) {
       console.error('Autostart toggle failed:', e);
-      // Hata durumunda toggle eski hâline döner
       try {
         const fallback = await isEnabled();
         setAutostartEnabled(fallback);
+        updateConfig('autoStart', fallback);
       } catch (_) { /* sessizce yut */ }
+      onAutostartError?.(t.autostartEnableFailed);
     }
   };
 
