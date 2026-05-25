@@ -32,11 +32,9 @@
 
 ## Tanıtım Videosu
 
-<p align="center">
-  <video src="https://github.com/ismail-kaykusuz/DPIReaper/releases/download/v1.0.0/DPIReaper-intro.mp4" controls width="640"></video>
-</p>
+https://github.com/user-attachments/assets/b6003e7e-43ff-4f26-b6ae-1c5299916569
 
-> Oynatıcı yüklenmezse: [DPIReaper-intro.mp4](https://github.com/ismail-kaykusuz/DPIReaper/releases/download/v1.0.0/DPIReaper-intro.mp4)
+> Yedek (release CDN): [DPIReaper-intro.mp4](https://github.com/ismail-kaykusuz/DPIReaper/releases/download/v1.0.0/DPIReaper-intro.mp4)
 
 <p align="center">
   <i>DPIReaper ücretsiz ve öyle kalacak. Faydasını gördüyseniz <b>Patreon</b>'da bir kahve geliştirmeyi yaşatır — detay için aşağıdaki <a href="#projeyi-destekle">Projeyi Destekle</a>.</i><br><br>

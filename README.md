@@ -32,12 +32,9 @@
 
 ## Demo
 
-<p align="center">
-  <video src="https://github.com/ismail-kaykusuz/DPIReaper/releases/download/v1.0.0/DPIReaper-intro.mp4" controls width="640"></video>
-</p>
+https://github.com/user-attachments/assets/b6003e7e-43ff-4f26-b6ae-1c5299916569
 
-> If the embedded player does not load, watch it here:
-> [DPIReaper-intro.mp4](https://github.com/ismail-kaykusuz/DPIReaper/releases/download/v1.0.0/DPIReaper-intro.mp4)
+> Mirror (release CDN): [DPIReaper-intro.mp4](https://github.com/ismail-kaykusuz/DPIReaper/releases/download/v1.0.0/DPIReaper-intro.mp4)
 
 <p align="center">
   <i>DPIReaper is free and will stay free. If it saves you time, a coffee on <b>Patreon</b> keeps the lights on — see <a href="#support-the-project">Support the Project</a> below.</i><br><br>
