@@ -33,11 +33,11 @@
 ## Demo
 
 <p align="center">
-  <video src="https://github.com/ismail-kaykusuz/DPIReaper/raw/main/images/DPIReaperSetup-app-introduction.mp4" controls width="640"></video>
+  <video src="https://github.com/ismail-kaykusuz/DPIReaper/releases/download/v1.0.0/DPIReaper-intro.mp4" controls width="640"></video>
 </p>
 
 > If the embedded player does not load, watch it here:
-> [`images/DPIReaperSetup-app-introduction.mp4`](images/DPIReaperSetup-app-introduction.mp4)
+> [DPIReaper-intro.mp4](https://github.com/ismail-kaykusuz/DPIReaper/releases/download/v1.0.0/DPIReaper-intro.mp4)
 
 <p align="center">
   <i>DPIReaper is free and will stay free. If it saves you time, a coffee on <b>Patreon</b> keeps the lights on — see <a href="#support-the-project">Support the Project</a> below.</i><br><br>
