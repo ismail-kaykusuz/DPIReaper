@@ -4,7 +4,7 @@
 
 export const URLS = {
   github: 'https://github.com/ismail-kaykusuz/DPIReaper',
-  discord: 'https://discord.gg/5jyWc3RSvk',
+  discord: 'https://discord.gg/s8nqMqecXY',
   patreon: 'https://www.patreon.com/16093117/join',
 };
 
