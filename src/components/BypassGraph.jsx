@@ -1,16 +1,8 @@
 import React, { useMemo } from 'react';
 import { Activity } from 'lucide-react';
 
-/** 1234 → "1.2K", 1234567 → "1.2M" */
-function formatCount(n) {
-  const v = Number(n) || 0;
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(v >= 10_000_000 ? 0 : 1)}M`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(v >= 10_000 ? 0 : 1)}K`;
-  return String(v);
-}
-
 /**
- * Ana ekranda sidecar'dan gelen bypass olaylarını gösteren mini çizgi grafik.
+ * Ana ekranda sidecar'dan gelen aktiviteyi gösteren mini çizgi grafik.
  *
  * PERF: React.memo ile sarılmış — yalnızca `stats` referansı değişince yeniden
  * render olur. App.jsx tarafında flushBypassStats 250ms throttle ile çağrılır,
@@ -58,9 +50,6 @@ function BypassGraph({ stats, t, visible = true }) {
           <Activity size={11} strokeWidth={2.4} />
           {t.bypassGraphTitle}
         </span>
-        <span className={`bypass-graph-meta ${isLive ? '' : 'is-idle'}`}>
-          {t.bypassGraphConnections(formatCount(stats?.connections ?? 0))} · {t.bypassGraphEvents(formatCount(stats?.bypassEvents ?? 0))}
-        </span>
       </div>
       <svg className="bypass-graph-svg" viewBox="0 0 280 38" preserveAspectRatio="none" role="img">
         <defs>
@@ -80,6 +69,9 @@ function BypassGraph({ stats, t, visible = true }) {
           strokeLinejoin="round"
         />
       </svg>
+      {!isLive && t.bypassGraphIdleHint && (
+        <div className="bypass-graph-idle-hint">{t.bypassGraphIdleHint}</div>
+      )}
     </div>
   );
 }

@@ -1,15 +1,17 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod isp_detect;
+mod setup_page;
 
 use local_ip_address::list_afinet_netifas;
 use std::io::Write;
 use std::net::{IpAddr, TcpListener, TcpStream};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::OnceLock;
 use std::thread;
 use std::time::Duration;
+use setup_page::make_setup_html;
 use tauri::Emitter;
 use tauri::Manager;
 
@@ -371,6 +373,7 @@ pub struct PacServerState {
     pub pac_cache: Arc<Mutex<PacCache>>,
     pub pac_port: Mutex<u16>,
     pub pac_url: Mutex<String>,
+    pub proxy_port: Arc<AtomicU16>,
 }
 
 impl Default for PacServerState {
@@ -385,6 +388,7 @@ impl Default for PacServerState {
             })),
             pac_port: Mutex::new(0),
             pac_url: Mutex::new(String::new()),
+            proxy_port: Arc::new(AtomicU16::new(8080)),
         }
     }
 }
@@ -452,207 +456,6 @@ fn make_pac_body(lan_ip: &str, proxy_port: u16) -> String {
     )
 }
 
-fn make_setup_html(pac_url: &str) -> String {
-    format!(
-        r#"<!DOCTYPE html>
-<html lang="tr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
-<title>DPIReaper – Kurulum</title>
-<style>
-:root {{
-    --bg-color: #09090b;
-    --card-bg: #18181b;
-    --primary: #3b82f6;
-    --primary-hover: #2563eb;
-    --success: #22c55e;
-    --text-main: #f8fafc;
-    --text-muted: #94a3b8;
-    --border: rgba(255,255,255,0.08);
-}}
-* {{ box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }}
-body {{ background-color: var(--bg-color); color: var(--text-main); line-height: 1.5; padding: 20px 16px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }}
-.container {{ width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 20px; }}
-
-/* Header */
-.header {{ text-align: center; margin-bottom: 10px; animation: fadeDown 0.6s ease; }}
-.title {{ font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4px; }}
-.subtitle {{ font-size: 0.9rem; color: var(--text-muted); }}
-
-/* Card */
-.card {{ background: var(--card-bg); border: 1px solid var(--border); border-radius: 20px; padding: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); animation: fadeUp 0.6s ease; }}
-.card-title {{ font-size: 1.05rem; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }}
-
-/* Input Group */
-.input-group {{ position: relative; margin-bottom: 16px; }}
-.url-input {{ width: 100%; background: #27272a; border: 1px solid #3f3f46; color: var(--text-main); font-size: 0.9rem; padding: 14px 16px; border-radius: 12px; outline: none; transition: border-color 0.2s; -webkit-user-select: all; user-select: all; }}
-.url-input:focus {{ border-color: var(--primary); }}
-
-/* Copy Button */
-.btn-copy {{ width: 100%; height: 50px; background: var(--primary); color: #fff; font-size: 1.05rem; font-weight: 600; padding: 0 20px; border: none; border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 12px rgba(59,130,246,0.3); }}
-.btn-copy:active {{ transform: scale(0.98); }}
-.btn-copy.success {{ background: var(--success); box-shadow: 0 4px 12px rgba(34,197,94,0.3); }}
-
-/* Guide Button */
-.btn-guide {{ display: inline-flex; align-items: center; justify-content: center; background: var(--success); color: #fff; text-decoration: none; padding: 12px 16px; border-radius: 12px; font-size: 0.9rem; font-weight: 600; border: none; width: 100%; margin-top: 12px; transition: all 0.2s; box-shadow: 0 4px 12px rgba(34,197,94,0.3); }}
-.btn-guide:active {{ transform: scale(0.98); opacity: 0.9; }}
-
-/* Steps */
-.step-list {{ list-style: none; counter-reset: custom-counter; margin-top: 10px; display: flex; flex-direction: column; gap: 12px; }}
-.step-item {{ position: relative; padding-left: 36px; font-size: 0.9rem; color: #a1a1aa; }}
-.step-item::before {{ content: counter(custom-counter); counter-increment: custom-counter; position: absolute; left: 0; top: -1px; width: 24px; height: 24px; background: rgba(255,255,255,0.1); color: #fff; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; justify-content: center; border-radius: 50%; }}
-.step-item strong {{ color: #e2e8f0; font-weight: 600; display: block; margin-bottom: 2px; }}
-
-/* Language Switcher */
-.lang-switcher {{ display: flex; justify-content: center; gap: 12px; margin-bottom: 8px; animation: fadeDown 0.6s ease; }}
-.lang-btn {{ background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: #fff; padding: 6px 16px; border-radius: 10px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-weight: 500; }}
-.lang-btn.active {{ background: var(--primary); border-color: var(--primary); font-weight: 700; box-shadow: 0 0 15px rgba(59,130,246,0.3); }}
-
-/* Divider */
-.divider {{ height: 1px; background: var(--border); margin: 24px 0; }}
-
-/* Animations */
-@keyframes fadeUp {{ from {{ opacity: 0; transform: translateY(15px); }} to {{ opacity: 1; transform: translateY(0); }} }}
-@keyframes fadeDown {{ from {{ opacity: 0; transform: translateY(-15px); }} to {{ opacity: 1; transform: translateY(0); }} }}
-
-/* Notice */
-.notice {{ background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); padding: 12px; border-radius: 12px; margin-top: 20px; font-size: 0.85rem; color: #fca5a5; display: flex; align-items: flex-start; gap: 10px; }}
-.notice-icon {{ font-size: 1.2rem; }}
-</style>
-</head>
-<body>
-<div class="container">
-    <div class="lang-switcher">
-        <button class="lang-btn active" id="btn-tr">TÜRKÇE</button>
-        <button class="lang-btn" id="btn-en">ENGLISH</button>
-    </div>
-
-    <header class="header">
-        <h1 class="title" data-tr="DPIReaper'a Bağlan" data-en="Connect to DPIReaper">DPIReaper'a Bağlan</h1>
-        <p class="subtitle" data-tr="İnternet trafiğinizi şifreleyin ve engelleri aşın" data-en="Bypass Internet Restrictions">İnternet Engellerini Aşın</p>
-    </header>
-
-    <div class="notice" style="margin-top: 0; margin-bottom: 20px;">
-        <span class="notice-icon">⚠</span>
-        <div>
-            <strong data-tr="DİKKAT:" data-en="ATTENTION:">DİKKAT:</strong>
-            <span data-tr="DPIReaper kapatıldıktan sonra YouTube vb. uygulamalarda internet sorunu yaşarsanız (eski önbellek nedeniyle), Wi-Fi bağlantısını kapatıp açmanız yeterlidir." data-en="If apps like YouTube lose internet access after closing DPIReaper (due to cached connections), simply toggle your Wi-Fi off and on.">DPIReaper kapatıldıktan sonra YouTube vb. uygulamalarda internet sorunu yaşarsanız (eski önbellek nedeniyle), Wi-Fi bağlantısını kapatıp açmanız yeterlidir.</span>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-title">
-            <span>📱</span> <span data-tr="Android & iPhone Kurulumu" data-en="Android & iPhone Setup">Android & iPhone Kurulumu</span>
-        </div>
-
-        <div class="input-group">
-            <input type="text" class="url-input" id="pacurl" value="{}" readonly onclick="this.select();">
-        </div>
-
-        <button class="btn-copy" id="copybtn" data-tr="Adresi Kopyala" data-en="Copy Address">
-            Adresi Kopyala
-        </button>
-
-        <div class="divider"></div>
-
-        <div class="card-title" style="font-size:0.95rem; margin-bottom:12px;" data-tr="Nasıl yapılır kısaca?" data-en="Quick Guide">Nasıl yapılır kısaca?</div>
-        <ul class="step-list">
-            <li class="step-item">
-                <strong data-tr="Yeşil butona basarak adresi kopyalayın." data-en="Copy the address using the green button.">Yeşil butona basarak adresi kopyalayın.</strong>
-                <span data-tr="Kopyalanmazsa kutuya uzun basıp elle kopyalayın." data-en="If copy fails, long press the box to copy manually.">Kopyalanmazsa kutuya uzun basıp elle kopyalayın.</span>
-            </li>
-            <li class="step-item">
-                <strong data-tr="Wi-Fi ayarlarınıza gidin." data-en="Go to Wi-Fi settings.">Wi-Fi ayarlarınıza gidin.</strong>
-                <span data-tr="Bağlı olduğunuz ağın yanındaki (Ayarlar ⚙️ / i) ikonuna dokunun." data-en="Tap the (Settings ⚙️ / i) icon next to your network.">Bağlı olduğunuz ağın yanındaki (Ayarlar ⚙️ / i) ikonuna dokunun.</span>
-            </li>
-            <li class="step-item">
-                <strong data-tr="Proxy ayarını 'Otomatik / PAC' olarak değiştirin." data-en="Change Proxy to 'Automatic / PAC'.">Proxy ayarını "Otomatik / PAC" olarak değiştirin.</strong>
-                <span data-tr="Gelişmiş ayarlar menüsünün altında bulunabilir." data-en="Can be found under advanced settings.">Gelişmiş ayarlar menüsünün altında bulunabilir.</span>
-            </li>
-            <li class="step-item">
-                <strong data-tr="Kopyaladığınız adresi yapıştırın ve kaydedin." data-en="Paste the copied address and save.">Kopyaladığınız adresi yapıştırın ve kaydedin.</strong>
-                <span data-tr="Artık bağlantınız güvende!" data-en="Your connection is now secure!">Artık bağlantınız güvende!</span>
-            </li>
-        </ul>
-    </div>
-</div>
-
-<script>
-(function() {{
-    var url = document.getElementById('pacurl').value;
-    var btn = document.getElementById('copybtn');
-    var currentLang = 'tr';
-
-    function setLanguage(lang) {{
-        currentLang = lang;
-        document.querySelectorAll('[data-tr]').forEach(function(el) {{
-            el.innerHTML = el.getAttribute('data-' + lang);
-        }});
-        document.getElementById('btn-tr').classList.toggle('active', lang === 'tr');
-        document.getElementById('btn-en').classList.toggle('active', lang === 'en');
-        
-        // Kopyalanmış buton metnini koruyalım eğer o andaysa
-        if (btn.classList.contains('success')) {{
-             btn.innerHTML = (lang === 'tr' ? '✓ Kopyalandı!' : '✓ Copied!');
-        }}
-    }}
-
-    document.getElementById('btn-tr').onclick = function() {{ setLanguage('tr'); }};
-    document.getElementById('btn-en').onclick = function() {{ setLanguage('en'); }};
-
-    function tryCopy() {{
-        if (navigator.clipboard && navigator.clipboard.writeText) {{
-            navigator.clipboard.writeText(url).then(function() {{
-                showSuccess();
-            }}).catch(fallbackCopyTextToClipboard);
-        }} else {{
-            fallbackCopyTextToClipboard();
-        }}
-    }}
-
-    function showSuccess() {{
-        var originalText = btn.getAttribute('data-' + currentLang);
-        btn.innerHTML = (currentLang === 'tr' ? '✓ Kopyalandı!' : '✓ Copied!');
-        btn.classList.add('success');
-        setTimeout(function() {{
-            btn.innerHTML = originalText;
-            btn.classList.remove('success');
-        }}, 2500);
-    }}
-
-    function fallbackCopyTextToClipboard() {{
-        var textArea = document.createElement("textarea");
-        textArea.value = url;
-        textArea.style.top = "0";
-        textArea.style.left = "0";
-        textArea.style.position = "fixed";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        try {{
-            var successful = document.execCommand('copy');
-            if (successful) showSuccess();
-        }} catch (err) {{ }}
-        document.body.removeChild(textArea);
-    }}
-
-    btn.onclick = tryCopy;
-}})();
-</script>
-</body>
-</html>"#,
-        html_escape(pac_url)
-    )
-}
-
-fn html_escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-}
-
 /// Absolute URL'den path kısmını çıkarır.
 /// "http://192.168.1.5:8787/proxy.pac" → "/proxy.pac"
 /// "http://192.168.1.5:8787/"          → "/"
@@ -673,6 +476,7 @@ fn handle_pac_request(
     pac_body: &Arc<Mutex<String>>,
     pac_cache: &Arc<Mutex<PacCache>>,
     pac_url: &str,
+    proxy_port: u16,
 ) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
     let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
@@ -699,11 +503,9 @@ fn handle_pac_request(
     let raw_path = first_line
         .split_whitespace()
         .nth(1)
-        .unwrap_or("/")
-        .split('?')
-        .next()
         .unwrap_or("/");
-    let path = normalize_path(raw_path);
+    let (path_only, lang) = setup_page::parse_lang_from_path(raw_path);
+    let path = normalize_path(path_only);
 
     let is_get = first_line.to_uppercase().starts_with("GET ");
 
@@ -778,7 +580,7 @@ fn handle_pac_request(
         (
             "200 OK",
             "text/html; charset=utf-8",
-            make_setup_html(pac_url),
+            make_setup_html(pac_url, proxy_port, lang),
         )
     } else {
         ("404 Not Found", "text/plain", String::new())
@@ -880,6 +682,7 @@ fn start_pac_server(
     state: tauri::State<'_, PacServerState>,
 ) -> Result<PacResponse, String> {
     let lan_ip = get_safe_lan_ip();
+    state.proxy_port.store(proxy_port, Ordering::Relaxed);
 
     // PAC body'yi güncelle — proxy moduna geç
     let new_pac_body = make_pac_body(&lan_ip, proxy_port);
@@ -951,6 +754,7 @@ fn start_pac_server(
     let pac_body_arc = Arc::clone(&state.pac_body);
     let pac_cache_arc = Arc::clone(&state.pac_cache);
     let pac_url_for_thread = pac_url.clone();
+    let proxy_port_arc = Arc::clone(&state.proxy_port);
 
     // P1-FIX: Thread limiti için atomik sayaç
     let active_connections = Arc::new(std::sync::atomic::AtomicU32::new(0));
@@ -969,13 +773,15 @@ fn start_pac_server(
                     let body = Arc::clone(&pac_body_arc);
                     let cache = Arc::clone(&pac_cache_arc);
                     let url = pac_url_for_thread.clone();
+                    let proxy_port_live = Arc::clone(&proxy_port_arc);
                     let conn_counter = Arc::clone(&active_connections);
                     thread::spawn(move || {
                         let _ = stream.set_nonblocking(false);
                         let _ = stream.set_nodelay(true);
                         let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
                         let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
-                        handle_pac_request(stream, &body, &cache, &url);
+                        let port = proxy_port_live.load(Ordering::Relaxed);
+                        handle_pac_request(stream, &body, &cache, &url, port);
                         conn_counter.fetch_sub(1, Ordering::Relaxed);
                     });
                 }
@@ -1315,11 +1121,40 @@ fn perform_app_exit(app: &tauri::AppHandle) {
     app.exit(0);
 }
 
+/// B4: Aktif sidecar PID'i bellekte tut — pencere kapanırken garantili kill için.
+fn sidecar_pid_lock() -> &'static Mutex<Option<u32>> {
+    static STORE: OnceLock<Mutex<Option<u32>>> = OnceLock::new();
+    STORE.get_or_init(|| Mutex::new(None))
+}
+
+fn kill_tracked_sidecar_blocking() {
+    let pid_opt = sidecar_pid_lock().lock().ok().and_then(|g| *g);
+    if let Some(pid) = pid_opt {
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            let _ = std::process::Command::new("taskkill")
+                .args(["/F", "/PID", &pid.to_string()])
+                .creation_flags(CREATE_NO_WINDOW)
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status();
+        }
+        if let Ok(mut g) = sidecar_pid_lock().lock() {
+            *g = None;
+        }
+    }
+}
+
 /// Uygulama açıldığında eski dpireaper-proxy süreçlerini temizle (Zombi süreç önleme)
 #[tauri::command]
 fn save_sidecar_pid(pid: u32) {
     let pid_file = std::env::temp_dir().join("dpireaper_sidecar.pid");
     let _ = std::fs::write(&pid_file, pid.to_string());
+    if let Ok(mut g) = sidecar_pid_lock().lock() {
+        *g = Some(pid);
+    }
 }
 
 /// Uygulama açıldığında eski dpireaper-proxy süreçlerini temizle (Zombi süreç önleme)
@@ -1529,6 +1364,202 @@ fn quit_app(app: tauri::AppHandle) {
     perform_app_exit(&app);
 }
 
+/// Madde 1: Uygulama `--autostart` argümanı ile mi başladı?
+/// Windows autostart Registry kaydı uygulamayı bu arg ile çağırır
+/// → frontend tarafında pencereyi tray'e küçültmek için kullanılır.
+#[tauri::command]
+fn is_autostarted() -> bool {
+    std::env::args().any(|a| a == "--autostart")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// BLOK 3 — C özellikleri için yeni Tauri komutları
+// ═══════════════════════════════════════════════════════════════════
+
+/// C14: Sidecar binary'sinin varlığını doğrula.
+/// Tamper / silinme / antivirüs karantinası durumlarını yakalar.
+#[tauri::command]
+fn check_sidecar_exists(app: tauri::AppHandle) -> bool {
+    if let Ok(res_dir) = app.path().resource_dir() {
+        let proxy_exe = res_dir.join("binaries").join("dpireaper-proxy.exe");
+        if proxy_exe.exists() {
+            return true;
+        }
+        let proxy_exe_alt = res_dir
+            .join("binaries")
+            .join("dpireaper-proxy-x86_64-pc-windows-msvc.exe");
+        if proxy_exe_alt.exists() {
+            return true;
+        }
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            let direct = parent.join("dpireaper-proxy.exe");
+            if direct.exists() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// C5: Proxy bağlantısının sağlığını test eder.
+/// Proxy üzerinden bir TCP handshake denenir (`connectivitycheck.gstatic.com:80`).
+#[derive(serde::Serialize)]
+pub struct ProxyHealth {
+    pub ok: bool,
+    #[serde(rename = "latencyMs")]
+    pub latency_ms: u32,
+}
+
+#[tauri::command]
+async fn check_proxy_health(proxy_port: u16) -> ProxyHealth {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let start = std::time::Instant::now();
+        let proxy_addr = format!("127.0.0.1:{}", proxy_port);
+        let mut stream = match std::net::TcpStream::connect_timeout(
+            &match proxy_addr.parse() {
+                Ok(a) => a,
+                Err(_) => return ProxyHealth { ok: false, latency_ms: 0 },
+            },
+            Duration::from_millis(1500),
+        ) {
+            Ok(s) => s,
+            Err(_) => return ProxyHealth { ok: false, latency_ms: 0 },
+        };
+        let _ = stream.set_read_timeout(Some(Duration::from_millis(2500)));
+        let _ = stream.set_write_timeout(Some(Duration::from_millis(1500)));
+        let req = b"CONNECT connectivitycheck.gstatic.com:80 HTTP/1.1\r\nHost: connectivitycheck.gstatic.com:80\r\n\r\n";
+        if std::io::Write::write_all(&mut stream, req).is_err() {
+            return ProxyHealth { ok: false, latency_ms: 0 };
+        }
+        let mut buf = [0u8; 64];
+        let ok = matches!(std::io::Read::read(&mut stream, &mut buf), Ok(n) if n > 0 && String::from_utf8_lossy(&buf[..n]).contains("200"));
+        let latency = start.elapsed().as_millis() as u32;
+        ProxyHealth { ok, latency_ms: latency }
+    })
+    .await;
+    result.unwrap_or(ProxyHealth { ok: false, latency_ms: 0 })
+}
+
+/// C18: Sistemdeki gerçek ağ arayüzlerini listele (LAN sharing picker için).
+#[derive(serde::Serialize)]
+pub struct NetworkInterfaceInfo {
+    pub name: String,
+    pub ip: String,
+    pub is_virtual: bool,
+}
+
+#[tauri::command]
+fn list_network_interfaces() -> Vec<NetworkInterfaceInfo> {
+    const VIRTUAL_KEYWORDS: &[&str] = &[
+        "virtual", "vmware", "vmnet", "vbox", "virtualbox", "pseudo", "hamachi", "vpn",
+        "vethernet", "loopback", "docker", "wsl", "hyper-v", "bluetooth", "teredo", "isatap",
+        "6to4", "tap-", "tun", "warp", "tailscale", "zerotier", "nordlynx", "wireguard", "proton",
+        "mullvad", "windscribe", "surfshark", "host-only", "hostonly", "npcap", "miniport",
+    ];
+    let mut out = Vec::new();
+    if let Ok(netifs) = list_afinet_netifas() {
+        for (name, ip) in netifs {
+            if let IpAddr::V4(v4) = ip {
+                if v4.is_loopback() || v4.is_link_local() {
+                    continue;
+                }
+                let name_lower = name.to_lowercase();
+                let is_virtual = VIRTUAL_KEYWORDS.iter().any(|k| name_lower.contains(k));
+                out.push(NetworkInterfaceInfo {
+                    name,
+                    ip: v4.to_string(),
+                    is_virtual,
+                });
+            }
+        }
+    }
+    out
+}
+
+/// C16: Genişletilmiş onarım — WinHTTP reset + flushdns + firewall + proxy clear.
+#[tauri::command]
+fn repair_internet_extended() -> Result<String, String> {
+    let _ = clear_system_proxy();
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+        // 1. WinHTTP reset
+        let _ = std::process::Command::new("netsh")
+            .args(&["winhttp", "reset", "proxy"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+
+        // 2. DNS cache
+        let _ = std::process::Command::new("ipconfig")
+            .arg("/flushdns")
+            .creation_flags(CREATE_NO_WINDOW)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+
+        // 3. Firewall rules — kurulu kuralları temizle
+        manage_firewall_rules(false, 0, 0);
+
+        // 4. Tarayıcılara bildir
+        notify_proxy_change();
+    }
+    Ok("OK".into())
+}
+
+/// C3: Özel bypass listesini Windows Registry ProxyOverride'a uygula.
+/// Mevcut hardcoded liste ile birleşir.
+#[tauri::command]
+fn apply_custom_bypass(domains: Vec<String>, proxy_port: u16) -> Result<(), String> {
+    if proxy_port == 0 {
+        return Ok(());
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let _guard = acquire_proxy_lock();
+        // Sadece geçerli domain karakterleri
+        let safe: Vec<String> = domains
+            .into_iter()
+            .map(|d| d.trim().to_lowercase())
+            .filter(|d| {
+                !d.is_empty()
+                    && d.len() <= 253
+                    && d.chars().all(|c| {
+                        c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '*'
+                    })
+            })
+            .take(64)
+            .collect();
+        // Bunları ProxyOverride'a eklemek için set_proxy'yi tekrar çağırmak yerine,
+        // mevcut listeyi okuyup ekstra ekleme yapalım.
+        if let Some(current) = registry::read_value_string("ProxyOverride") {
+            let mut parts: Vec<String> =
+                current.split(';').map(|s| s.to_string()).collect();
+            for d in safe {
+                if !parts.iter().any(|p| p.eq_ignore_ascii_case(&d)) {
+                    parts.push(d);
+                }
+            }
+            let new_override = parts.join(";");
+            let _ = registry::set_proxy("127.0.0.1", proxy_port);
+            let hkcu = winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
+            if let Ok((key, _)) = hkcu.create_subkey(
+                r"Software\Microsoft\Windows\CurrentVersion\Internet Settings",
+            ) {
+                let _ = key.set_value("ProxyOverride", &new_override);
+            }
+            notify_proxy_change();
+        }
+    }
+    let _ = proxy_port;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // P0-FIX: Single-instance enforcement — aynı anda sadece bir DPIReaper çalışabilir
@@ -1546,6 +1577,10 @@ pub fn run() {
             if handle.is_null() || GetLastError() == ERROR_ALREADY_EXISTS {
                 eprintln!("[STARTUP] ❌ DPIReaper zaten çalışıyor — çıkılıyor");
 
+                // TODO(B11): Pencere başlığı yerine WebView class adıyla bul.
+                // FindWindowW şu anda tauri.conf.json'daki sabit "DPIReaper" başlığına
+                // güveniyor; başlık dil değişimi/i18n ile değişirse mevcut pencereyi
+                // öne getirme bozulabilir.
                 use winapi::um::winuser::{
                     FindWindowW, IsIconic, SetForegroundWindow, ShowWindow, SW_RESTORE,
                 };
@@ -1568,7 +1603,6 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(PacServerState::default())
-        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             #[cfg(desktop)]
@@ -1660,11 +1694,13 @@ pub fn run() {
                     })
                     .build(app)?;
 
-                // LAYER 2: Window close cleanup
+                // LAYER 2: Window close cleanup (B4: garantili sidecar kill)
                 if let Some(window) = app.get_webview_window("main") {
                     let app_handle = app.handle().clone();
                     window.on_window_event(move |event| {
                         if let tauri::WindowEvent::Destroyed = event {
+                            // B4: JS cleanup tetiklenmese bile sidecar'ı kill et
+                            kill_tracked_sidecar_blocking();
                             let _ = clear_system_proxy();
                             // ✅ P2-FIX: PAC'i de DIRECT'e geçir
                             if let Some(pac_state) = app_handle.try_state::<PacServerState>() {
@@ -1682,13 +1718,14 @@ pub fn run() {
             }
             Ok(())
         })
-        .plugin(tauri_plugin_autostart::Builder::new().build())
-        .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_opener::init())
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .app_name("DPIReaper")
+                .args(["--autostart"])
+                .build(),
+        )
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_fs::init())
-        // notification plugin zaten yukarıda kayıtlı, tekrar ekleme
         .invoke_handler(tauri::generate_handler![
             clear_system_proxy,
             set_system_proxy,
@@ -1704,13 +1741,21 @@ pub fn run() {
             startup_proxy_cleanup,
             add_defender_exclusions,
             isp_detect::detect_isp,
-            quit_app
+            quit_app,
+            is_autostarted,
+            // BLOK 3 — C özellikleri
+            check_sidecar_exists,
+            check_proxy_health,
+            list_network_interfaces,
+            repair_internet_extended,
+            apply_custom_bypass
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
             // LAYER 3: App exit cleanup (fallback)
             if let tauri::RunEvent::ExitRequested { .. } = event {
+                kill_tracked_sidecar_blocking();
                 let _ = clear_system_proxy();
                 if let Some(state) = app_handle.try_state::<PacServerState>() {
                     // Grace period'u kısalt — App.jsx zaten 1.5s (şimdi 0.5s) bekledi

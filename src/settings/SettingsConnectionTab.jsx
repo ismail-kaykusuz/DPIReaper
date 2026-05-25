@@ -1,10 +1,26 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RotateCw, Activity } from 'lucide-react';
-import Toggle from './Toggle';
+import { RotateCw, Activity, Sparkles, Smartphone } from 'lucide-react';
 import ConnectionProfilePicker from './ConnectionProfilePicker';
+import Toggle from './Toggle';
 
-/** Ayarlar → BAĞLANTI sekmesi: profil seçici + DNS. */
+// DNS sağlayıcı görsel kimliği (lokal SVG yerine renkli yuvarlak + baş harf).
+const DNS_BRANDS = {
+  cloudflare: { color: '#f38020', short: 'CF' },
+  adguard:    { color: '#68bc71', short: 'A' },
+  google:     { color: '#4285f4', short: 'G' },
+  quad9:      { color: '#9013fe', short: 'Q' },
+  opendns:    { color: '#e2342f', short: 'O' },
+};
+
+const pingClass = (ms) => {
+  if (!ms || ms >= 999) return 'dns-card-ping--off';
+  if (ms < 50) return 'dns-card-ping--fast';
+  if (ms < 150) return 'dns-card-ping--mid';
+  return 'dns-card-ping--slow';
+};
+
+/** Ayarlar → BAĞLANTI sekmesi: profil seçici + modern DNS kartları. */
 const SettingsConnectionTab = ({
   config,
   updateConfig,
@@ -14,99 +30,124 @@ const SettingsConnectionTab = ({
   isChecking,
   checkAllLatencies,
   ispDetection = null,
-}) => (
-  <motion.div
-    key="connection-tab"
-    initial={{ opacity: 0, x: -15 }}
-    animate={{ opacity: 1, x: 0 }}
-    exit={{ opacity: 0, x: 15 }}
-    transition={{ duration: 0.2, ease: 'easeInOut' }}
-    style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}
-  >
-    {/* Bağlantı profili (tek karar) */}
-    <ConnectionProfilePicker config={config} updateConfig={updateConfig} t={t} ispDetection={ispDetection} />
+}) => {
+  const isAutoMode = config.dnsMode === 'auto';
 
-    {/* DNS */}
-    <div className="v2-section">
-      <div className="v2-section-title">{t.sectionDns}</div>
-      <div className="v2-card">
-        {/* Otomatik Seçim — her zaman en üstte ve ilk kurulumda varsayılan */}
-        <div className="v2-item">
-          <div className="v2-item-text">
-            <h3>{t.dnsAutoSelect}</h3>
-            <p>{t.dnsAutoSelectDesc}</p>
-          </div>
-          <Toggle
-            checked={config.dnsMode === 'auto'}
-            onChange={(v) => {
-              updateConfig('dnsMode', v ? 'auto' : 'manual');
-              if (v) checkAllLatencies(true);
-            }}
-          />
-        </div>
+  return (
+    <motion.div
+      key="connection-tab"
+      initial={{ opacity: 0, x: -15 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 15 }}
+      transition={{ duration: 0.2, ease: 'easeInOut' }}
+      style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
+    >
+      {/* Bağlantı profili */}
+      <ConnectionProfilePicker
+        config={config}
+        updateConfig={updateConfig}
+        t={t}
+        ispDetection={ispDetection}
+      />
 
-        <div style={{ padding: '0 16px 16px' }}>
+      {/* DNS — modern kart listesi */}
+      <div className="v2-section">
+        <div className="dns-section-header">
+          <span className="v2-section-title">{t.sectionDns}</span>
           <button
             type="button"
             onClick={() => checkAllLatencies()}
             disabled={isChecking}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              background: 'var(--surface-2)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-default)',
-              padding: '10px 0',
-              borderRadius: 8,
-              fontSize: '0.82rem',
-              fontWeight: 600,
-              cursor: isChecking ? 'wait' : 'pointer',
-              transition: 'all var(--transition-fast)',
-            }}
+            className="icon-btn"
+            aria-label={t.dnsCheckSpeed}
+            title={t.dnsCheckSpeed}
           >
-            {isChecking ? <RotateCw size={16} className="spin" /> : <Activity size={16} />}
-            {isChecking ? t.dnsChecking : t.dnsCheckSpeed}
+            {isChecking ? <RotateCw size={14} className="spin" /> : <Activity size={14} />}
           </button>
         </div>
 
-        <div className="v2-divider" style={{ margin: 0 }} />
+        <div className="dns-card-list">
+          {/* Otomatik Seçim kartı — her zaman üstte */}
+          <div
+            role="radio"
+            tabIndex={0}
+            aria-checked={isAutoMode}
+            className={`dns-card dns-card--auto ${isAutoMode ? 'is-selected' : ''}`}
+            onClick={() => {
+              const next = !isAutoMode;
+              updateConfig('dnsMode', next ? 'auto' : 'manual');
+              if (next) checkAllLatencies(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                const next = !isAutoMode;
+                updateConfig('dnsMode', next ? 'auto' : 'manual');
+                if (next) checkAllLatencies(true);
+              }
+            }}
+          >
+            <div className="dns-card-icon dns-card-icon--auto">
+              <Sparkles size={14} strokeWidth={2.2} />
+            </div>
+            <div className="dns-card-meta">
+              <span className="dns-card-name">{t.dnsAutoSelect}</span>
+              <span className="dns-card-desc">{t.dnsAutoSelectDesc}</span>
+            </div>
+            <div className={`dns-card-radio ${isAutoMode ? 'on' : ''}`}>
+              {isAutoMode && <div className="dns-card-radio-dot" />}
+            </div>
+          </div>
 
-        <div className="v2-dns-list">
+          {/* DNS sağlayıcıları */}
           <AnimatePresence>
             {sortedProviders.filter((p) => p.id !== 'system').map((p) => {
-              const isSelected = config.selectedDns === p.id;
-              const isAutoMode = config.dnsMode === 'auto';
-              const isDisabled = isAutoMode;
+              const isSelected = !isAutoMode && config.selectedDns === p.id;
+              const brand = DNS_BRANDS[p.id] || { color: '#71717a', short: p.name?.[0] || '?' };
+              const ms = latencies[p.id];
               return (
                 <motion.div
                   layout
                   key={p.id}
-                  initial={{ opacity: 0, y: 10 }}
+                  role="radio"
+                  tabIndex={0}
+                  aria-checked={isSelected}
+                  initial={{ opacity: 0, y: 8 }}
                   animate={{
-                    opacity: isDisabled ? (isSelected ? 1 : 0.5) : (!isSelected ? 0.45 : 1),
+                    opacity: isAutoMode ? 0.55 : 1,
                     y: 0,
                   }}
-                  whileHover={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                  className={`v2-dns-item ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
+                  className={`dns-card ${isSelected ? 'is-selected' : ''} ${isAutoMode ? 'is-locked' : ''}`}
                   onClick={() => {
-                    if (isDisabled) return;
+                    if (isAutoMode) return;
                     updateConfig('selectedDns', p.id);
                   }}
+                  onKeyDown={(e) => {
+                    if (isAutoMode) return;
+                    if (e.key === ' ' || e.key === 'Enter') {
+                      e.preventDefault();
+                      updateConfig('selectedDns', p.id);
+                    }
+                  }}
                 >
-                  <div className={`v2-radio ${isSelected ? 'on' : ''}`}>
-                    {isSelected && <div className="v2-radio-dot" />}
+                  <div
+                    className="dns-card-icon"
+                    style={{ background: brand.color, color: '#fff' }}
+                  >
+                    {brand.short}
                   </div>
-                  <div className="v2-dns-info">
-                    <span className="v2-dns-name">{p.name}</span>
-                    <span className="v2-dns-desc">{p.desc}</span>
+                  <div className="dns-card-meta">
+                    <span className="dns-card-name">{p.name}</span>
+                    <span className="dns-card-desc">{p.desc}</span>
                   </div>
-                  {latencies[p.id] && (
-                    <div className="v2-latency">{latencies[p.id]}ms</div>
+                  {ms ? (
+                    <span className={`dns-card-ping ${pingClass(ms)}`}>{ms}ms</span>
+                  ) : (
+                    <div className={`dns-card-radio ${isSelected ? 'on' : ''}`}>
+                      {isSelected && <div className="dns-card-radio-dot" />}
+                    </div>
                   )}
                 </motion.div>
               );
@@ -114,8 +155,27 @@ const SettingsConnectionTab = ({
           </AnimatePresence>
         </div>
       </div>
-    </div>
-  </motion.div>
-);
+
+      {/* Diğer Cihazları Bağla — LAN sharing toggle */}
+      <div className="v2-section">
+        <div className="v2-section-title">{t.sectionConnectOtherDevices}</div>
+        <div className="v2-card">
+          <div className="v2-item">
+            <div className="v2-icon"><Smartphone size={20} /></div>
+            <div className="v2-item-text">
+              <h3>{t.connectionLanShareTitle}</h3>
+              <p>{t.connectionLanShareDesc}</p>
+            </div>
+            <Toggle
+              checked={config.lanSharing || false}
+              onChange={(v) => updateConfig('lanSharing', v)}
+              label={t.connectionLanShareTitle}
+            />
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
 
 export default SettingsConnectionTab;

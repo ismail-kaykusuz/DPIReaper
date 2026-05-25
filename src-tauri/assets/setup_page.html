@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="{{LANG}}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+<title>DPIReaper</title>
+<style>
+:root {
+  --bg: #09090b;
+  --card: #18181b;
+  --border: rgba(255,255,255,0.08);
+  --text: #f4f4f5;
+  --muted: #a1a1aa;
+  --accent: #3b82f6;
+  --accent-soft: rgba(59,130,246,0.12);
+  --success: #22c55e;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.55;
+  padding: 20px 16px 32px;
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap { max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.hero { text-align: center; padding: 8px 0 4px; }
+.logo { width: 56px; height: 56px; border-radius: 14px; margin-bottom: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
+.hero h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 6px; }
+.hero p { font-size: 0.88rem; color: var(--muted); }
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+}
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.tab {
+  flex: 1;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.tab.active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px rgba(59,130,246,0.25);
+}
+.panel { display: none; }
+.panel.active { display: block; }
+.panel-intro { font-size: 0.82rem; color: var(--muted); margin-bottom: 14px; }
+.field { margin-bottom: 12px; }
+.field-label { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.field-value {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text);
+  word-break: break-all;
+  user-select: all;
+}
+.copy-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.06);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.copy-btn:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+.copy-btn.ok { color: var(--success); background: rgba(34,197,94,0.12); }
+.steps { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+.step {
+  display: flex;
+  gap: 12px;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+.step-num {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+.step strong { display: block; color: var(--text); font-weight: 600; margin-bottom: 2px; font-size: 0.86rem; }
+.footer-note {
+  margin-top: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(59,130,246,0.2);
+  background: rgba(59,130,246,0.08);
+  font-size: 0.8rem;
+  color: #cbd5e1;
+}
+.footer-note strong { display: block; color: var(--text); margin-bottom: 4px; font-size: 0.82rem; }
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%) translateY(12px);
+  opacity: 0;
+  pointer-events: none;
+  background: #27272a;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  z-index: 99;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <img class="logo" src="/logo" alt="DPIReaper">
+    <h1 id="t-title"></h1>
+    <p id="t-subtitle"></p>
+  </header>
+
+  <div class="card">
+    <div class="tabs">
+      <button type="button" class="tab active" id="tab-pac" data-tab="pac"></button>
+      <button type="button" class="tab" id="tab-manual" data-tab="manual"></button>
+    </div>
+
+    <div class="panel active" id="panel-pac">
+      <p class="panel-intro" id="t-pac-intro"></p>
+      <div class="field">
+        <div class="field-label" id="t-pac-url-label"></div>
+        <div class="field-row">
+          <div class="field-value" id="pac-url">{{PAC_URL}}</div>
+          <button type="button" class="copy-btn" data-copy="pac-url" aria-label="Copy">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+      </div>
+      <ol class="steps" id="pac-steps"></ol>
+    </div>
+
+    <div class="panel" id="panel-manual">
+      <p class="panel-intro" id="t-manual-intro"></p>
+      <div class="field">
+        <div class="field-label" id="t-host-label"></div>
+        <div class="field-row">
+          <div class="field-value" id="proxy-host">{{PROXY_HOST}}</div>
+          <button type="button" class="copy-btn" data-copy="proxy-host" aria-label="Copy">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label" id="t-port-label"></div>
+        <div class="field-row">
+          <div class="field-value" id="proxy-port">{{PROXY_PORT}}</div>
+          <button type="button" class="copy-btn" data-copy="proxy-port" aria-label="Copy">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+      </div>
+      <ol class="steps" id="manual-steps"></ol>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    <strong id="t-footer-title"></strong>
+    <span id="t-footer-text"></span>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const LANG = '{{LANG}}';
+const I18N = {{I18N_JSON}};
+const t = I18N[LANG] || I18N.en;
+
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+function renderSteps(containerId, steps) {
+  const ul = document.getElementById(containerId);
+  if (!ul || !Array.isArray(steps)) return;
+  ul.innerHTML = steps.map(function(step, i) {
+    return '<li class="step"><span class="step-num">' + (i + 1) + '</span><div><strong>' + step.t + '</strong>' + step.b + '</div></li>';
+  }).join('');
+}
+
+setText('t-title', t.title);
+setText('t-subtitle', t.subtitle);
+setText('tab-pac', t.tabPac);
+setText('tab-manual', t.tabManual);
+setText('t-pac-intro', t.pacIntro);
+setText('t-manual-intro', t.manualIntro);
+setText('t-pac-url-label', t.pacUrlLabel);
+setText('t-host-label', t.hostLabel);
+setText('t-port-label', t.portLabel);
+setText('t-footer-title', t.footerTitle);
+setText('t-footer-text', t.footerText);
+renderSteps('pac-steps', t.pacSteps);
+renderSteps('manual-steps', t.manualSteps);
+
+document.querySelectorAll('.tab').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    const tab = btn.getAttribute('data-tab');
+    document.querySelectorAll('.tab').forEach(function(b) { b.classList.toggle('active', b === btn); });
+    document.getElementById('panel-pac').classList.toggle('active', tab === 'pac');
+    document.getElementById('panel-manual').classList.toggle('active', tab === 'manual');
+  });
+});
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(function() { toast.classList.remove('show'); }, 1800);
+}
+
+function copyText(text, btn) {
+  function done(ok) {
+    if (!ok) return;
+    if (btn) {
+      btn.classList.add('ok');
+      setTimeout(function() { btn.classList.remove('ok'); }, 1500);
+    }
+    showToast(t.copied);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function() { done(true); }).catch(fallback);
+  } else {
+    fallback();
+  }
+  function fallback() {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { done(document.execCommand('copy')); } catch (e) { done(false); }
+    document.body.removeChild(ta);
+  }
+}
+
+document.querySelectorAll('.copy-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    const target = btn.getAttribute('data-copy');
+    const el = document.getElementById(target === 'pac-url' ? 'pac-url' : target === 'proxy-host' ? 'proxy-host' : 'proxy-port');
+    if (el) copyText(el.textContent.trim(), btn);
+  });
+});
+</script>
+</body>
+</html>

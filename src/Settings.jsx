@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Globe, Wrench, Settings as SettingsIcon } from 'lucide-react';
+import { ChevronLeft, Network, Wrench, SlidersHorizontal } from 'lucide-react';
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { invoke } from '@tauri-apps/api/core';
 import { getTranslations } from './i18n';
-import SettingsAppTab from './settings/SettingsAppTab';
+import SettingsGeneralTab from './settings/SettingsGeneralTab';
 import SettingsConnectionTab from './settings/SettingsConnectionTab';
 import SettingsAdvancedTab from './settings/SettingsAdvancedTab';
 import ConnectionProfilePicker from './settings/ConnectionProfilePicker';
@@ -18,7 +18,18 @@ export { ConnectionProfilePicker };
  * Tüm sekme içerikleri `src/settings/Settings{App,Connection,Advanced}Tab.jsx` altındadır.
  * Bu bileşen yalnızca state + helper fonksiyonları yönetir.
  */
-const Settings = ({ onBack, config, updateConfig, dnsLatencies, setDnsLatencies, ispDetection = null }) => {
+const Settings = ({
+  onBack,
+  config,
+  updateConfig,
+  dnsLatencies,
+  setDnsLatencies,
+  ispDetection = null,
+  isConnected = false,
+  currentPort = 0,
+  defenderDecision = null,
+  requestDefenderExclusion = async () => false,
+}) => {
   const [activeTab, setActiveTab] = useState('connection');
   const scrollRef = useRef(null);
 
@@ -65,19 +76,41 @@ const Settings = ({ onBack, config, updateConfig, dnsLatencies, setDnsLatencies,
       try {
         const active = await isEnabled();
         setAutostartEnabled(active);
+        // Madde 1: Config ile gerçek Registry durumu uyumsuzsa config'i tetikle
+        if (config.autoStart !== active) {
+          updateConfig('autoStart', active);
+        }
       } catch (e) {
         console.error('Autostart check failed:', e);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // C15: İlk açılışta auto DNS ping — kullanıcı butona basmak zorunda kalmasın
+  useEffect(() => {
+    if (config.dnsMode !== 'auto') return;
+    if (Object.keys(latencies).length > 0) return;
+    // Latency boşsa arkaplanda bir kez ölç ve en hızlıyı seç
+    checkAllLatencies(true).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const toggleAutostart = async (val) => {
     try {
-      if (val) await enable(); else await disable();
-      setAutostartEnabled(val);
-      updateConfig('autoStart', val);
+      if (val) await enable();
+      else await disable();
+      // Madde 1: enable()/disable() sonrası gerçek Registry durumunu okuyup teyit et
+      const verified = await isEnabled();
+      setAutostartEnabled(verified);
+      updateConfig('autoStart', verified);
     } catch (e) {
       console.error('Autostart toggle failed:', e);
+      // Hata durumunda toggle eski hâline döner
+      try {
+        const fallback = await isEnabled();
+        setAutostartEnabled(fallback);
+      } catch (_) { /* sessizce yut */ }
     }
   };
 
@@ -120,7 +153,8 @@ const Settings = ({ onBack, config, updateConfig, dnsLatencies, setDnsLatencies,
     if (fixStatus === 'fixing') return;
     setFixStatus('fixing');
     try {
-      await invoke('clear_system_proxy');
+      // C16: Genişletilmiş onarım — proxy clear + WinHTTP reset + flushdns + firewall
+      await invoke('repair_internet_extended');
       window.dispatchEvent(new CustomEvent('dpireaper-force-disconnect', {
         detail: { reason: 'manual-fix' },
       }));
@@ -144,17 +178,6 @@ const Settings = ({ onBack, config, updateConfig, dnsLatencies, setDnsLatencies,
 
       <div className="v2-settings-content" ref={scrollRef}>
         <AnimatePresence mode="wait">
-          {activeTab === 'app' && (
-            <SettingsAppTab
-              config={config}
-              updateConfig={updateConfig}
-              t={t}
-              lang={lang}
-              autostartEnabled={autostartEnabled}
-              toggleAutostart={toggleAutostart}
-            />
-          )}
-
           {activeTab === 'connection' && (
             <SettingsConnectionTab
               config={config}
@@ -168,6 +191,17 @@ const Settings = ({ onBack, config, updateConfig, dnsLatencies, setDnsLatencies,
             />
           )}
 
+          {activeTab === 'general' && (
+            <SettingsGeneralTab
+              config={config}
+              updateConfig={updateConfig}
+              t={t}
+              lang={lang}
+              autostartEnabled={autostartEnabled}
+              toggleAutostart={toggleAutostart}
+            />
+          )}
+
           {activeTab === 'advanced' && (
             <SettingsAdvancedTab
               config={config}
@@ -175,6 +209,10 @@ const Settings = ({ onBack, config, updateConfig, dnsLatencies, setDnsLatencies,
               t={t}
               fixStatus={fixStatus}
               handleFixInternet={handleFixInternet}
+              isConnected={isConnected}
+              currentPort={currentPort}
+              defenderDecision={defenderDecision}
+              requestDefenderExclusion={requestDefenderExclusion}
             />
           )}
         </AnimatePresence>
@@ -182,27 +220,30 @@ const Settings = ({ onBack, config, updateConfig, dnsLatencies, setDnsLatencies,
 
       <nav className="bottom-nav" style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
         <button
-          className={`nav-btn ${activeTab === 'connection' ? 'active' : ''}`}
+          className={`nav-btn nav-btn--icon ${activeTab === 'connection' ? 'active' : ''}`}
           onClick={() => setActiveTab('connection')}
+          aria-label={t.tabConnection}
+          title={t.tabConnection}
         >
-          <Globe size={20} strokeWidth={activeTab === 'connection' ? 2.4 : 2} />
-          <span>{t.tabConnection || 'BAĞLANTI'}</span>
+          <Network size={20} strokeWidth={activeTab === 'connection' ? 2.4 : 2} />
         </button>
         <div className="nav-divider" />
         <button
-          className={`nav-btn ${activeTab === 'app' ? 'active' : ''}`}
-          onClick={() => setActiveTab('app')}
+          className={`nav-btn nav-btn--icon ${activeTab === 'general' ? 'active' : ''}`}
+          onClick={() => setActiveTab('general')}
+          aria-label={t.tabGeneral || t.tabApp}
+          title={t.tabGeneral || t.tabApp}
         >
-          <SettingsIcon size={20} strokeWidth={activeTab === 'app' ? 2.4 : 2} />
-          <span>{t.tabApp || 'UYGULAMA'}</span>
+          <SlidersHorizontal size={20} strokeWidth={activeTab === 'general' ? 2.4 : 2} />
         </button>
         <div className="nav-divider" />
         <button
-          className={`nav-btn ${activeTab === 'advanced' ? 'active' : ''}`}
+          className={`nav-btn nav-btn--icon ${activeTab === 'advanced' ? 'active' : ''}`}
           onClick={() => setActiveTab('advanced')}
+          aria-label={t.tabAdvanced}
+          title={t.tabAdvanced}
         >
           <Wrench size={20} strokeWidth={activeTab === 'advanced' ? 2.4 : 2} />
-          <span>{t.tabAdvanced || 'GELİŞMİŞ'}</span>
         </button>
       </nav>
     </div>

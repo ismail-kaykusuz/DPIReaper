@@ -1,0 +1,794 @@
+{
+  "en": {
+    "title": "Connect to DPIReaper",
+    "subtitle": "Set up this phone or tablet to use DPIReaper on your PC.",
+    "tabPac": "PAC setup",
+    "tabManual": "Manual proxy",
+    "pacIntro": "Recommended for iPhone and Android. The device downloads proxy rules automatically from the PAC URL.",
+    "manualIntro": "Use when PAC is not supported. Enter the PC hostname and proxy port manually.",
+    "pacUrlLabel": "PAC URL",
+    "hostLabel": "Hostname / IP",
+    "portLabel": "Port",
+    "footerTitle": "When DPIReaper disconnects",
+    "footerText": "If apps stop loading, turn Wi-Fi off and on once on this device. No need to change settings again when you reconnect.",
+    "copied": "Copied",
+    "pacSteps": [
+      {
+        "t": "Copy the PAC URL",
+        "b": "Tap the copy icon next to the address above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi (or Network) on your phone or tablet."
+      },
+      {
+        "t": "Open your network details",
+        "b": "Tap the (i) or gear icon on the Wi-Fi network you are connected to."
+      },
+      {
+        "t": "Set proxy to Automatic / PAC",
+        "b": "Android: Proxy → Automatic. iOS: Configure Proxy → Automatic."
+      },
+      {
+        "t": "Paste the PAC URL",
+        "b": "Paste the copied address, save, and leave DPIReaper connected on the PC while testing."
+      },
+      {
+        "t": "Verify",
+        "b": "Open a browser and visit a site that was blocked before."
+      }
+    ],
+    "manualSteps": [
+      {
+        "t": "Copy hostname and port",
+        "b": "Use the copy icons next to each value above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi on your device."
+      },
+      {
+        "t": "Edit the active network",
+        "b": "Tap (i) / gear on the connected network → Advanced or Proxy."
+      },
+      {
+        "t": "Choose Manual proxy",
+        "b": "Set proxy type to Manual (not PAC)."
+      },
+      {
+        "t": "Enter server and port",
+        "b": "Hostname = PC IP shown above. Port = proxy port (usually 8080)."
+      },
+      {
+        "t": "Save and test",
+        "b": "Save settings. DPIReaper must stay connected on the PC."
+      }
+    ]
+  },
+  "tr": {
+    "title": "DPIReaper'a Bağlan",
+    "subtitle": "Telefon veya tabletinizi PC'deki DPIReaper üzerinden yönlendirin.",
+    "tabPac": "PAC kurulumu",
+    "tabManual": "Manuel proxy",
+    "pacIntro": "iPhone ve Android için önerilir. Cihaz proxy kurallarını PAC adresinden otomatik alır.",
+    "manualIntro": "PAC desteklenmiyorsa kullanın. PC IP ve proxy portunu elle girin.",
+    "pacUrlLabel": "PAC adresi",
+    "hostLabel": "Sunucu / IP",
+    "portLabel": "Port",
+    "footerTitle": "DPIReaper bağlantısı kesilirse",
+    "footerText": "Uygulamalar açılmazsa cihazda Wi-Fi'yi bir kez kapatıp açmanız yeterli. Yeniden bağlanınca ayarı tekrar değiştirmenize gerek yok.",
+    "copied": "Kopyalandı",
+    "pacSteps": [
+      {
+        "t": "PAC adresini kopyalayın",
+        "b": "Yukarıdaki adresin yanındaki kopyala ikonuna dokunun."
+      },
+      {
+        "t": "Wi-Fi ayarlarını açın",
+        "b": "Ayarlar → Wi-Fi (veya Ağ) bölümüne gidin."
+      },
+      {
+        "t": "Bağlı ağın detayını açın",
+        "b": "Bağlı ağın yanındaki (i) veya dişli simgesine dokunun."
+      },
+      {
+        "t": "Proxy'yi Otomatik / PAC yapın",
+        "b": "Android: Proxy → Otomatik. iOS: Proxy Yapılandır → Otomatik."
+      },
+      {
+        "t": "PAC adresini yapıştırın",
+        "b": "Adresi yapıştırın, kaydedin. Test sırasında PC'de DPIReaper açık kalsın."
+      },
+      {
+        "t": "Doğrulayın",
+        "b": "Tarayıcıda daha önce engellenen bir siteyi açın."
+      }
+    ],
+    "manualSteps": [
+      {
+        "t": "Sunucu ve portu kopyalayın",
+        "b": "Yukarıdaki değerlerin yanındaki kopyala ikonlarını kullanın."
+      },
+      {
+        "t": "Wi-Fi ayarlarını açın",
+        "b": "Ayarlar → Wi-Fi."
+      },
+      {
+        "t": "Aktif ağı düzenleyin",
+        "b": "Bağlı ağda (i) / dişli → Gelişmiş veya Proxy."
+      },
+      {
+        "t": "Manuel proxy seçin",
+        "b": "Proxy türü Manuel (PAC değil) olmalı."
+      },
+      {
+        "t": "Sunucu ve portu girin",
+        "b": "Sunucu = yukarıdaki PC IP. Port = proxy portu (genelde 8080)."
+      },
+      {
+        "t": "Kaydedin ve test edin",
+        "b": "Kaydedin. PC'de DPIReaper bağlı kalmalı."
+      }
+    ]
+  },
+  "de": {
+    "title": "Mit DPIReaper verbinden",
+    "subtitle": "Richten Sie dieses Gerät über DPIReaper auf dem PC ein.",
+    "tabPac": "PAC-Einrichtung",
+    "tabManual": "Manueller Proxy",
+    "pacIntro": "Recommended for iPhone and Android. The device downloads proxy rules automatically from the PAC URL.",
+    "manualIntro": "Use when PAC is not supported. Enter the PC hostname and proxy port manually.",
+    "pacUrlLabel": "PAC URL",
+    "hostLabel": "Hostname / IP",
+    "portLabel": "Port",
+    "footerTitle": "Wenn DPIReaper trennt",
+    "footerText": "Apps laden nicht? Wi-Fi einmal aus- und einschalten.",
+    "copied": "Kopiert",
+    "pacSteps": [
+      {
+        "t": "Copy the PAC URL",
+        "b": "Tap the copy icon next to the address above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi (or Network) on your phone or tablet."
+      },
+      {
+        "t": "Open your network details",
+        "b": "Tap the (i) or gear icon on the Wi-Fi network you are connected to."
+      },
+      {
+        "t": "Set proxy to Automatic / PAC",
+        "b": "Android: Proxy → Automatic. iOS: Configure Proxy → Automatic."
+      },
+      {
+        "t": "Paste the PAC URL",
+        "b": "Paste the copied address, save, and leave DPIReaper connected on the PC while testing."
+      },
+      {
+        "t": "Verify",
+        "b": "Open a browser and visit a site that was blocked before."
+      }
+    ],
+    "manualSteps": [
+      {
+        "t": "Copy hostname and port",
+        "b": "Use the copy icons next to each value above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi on your device."
+      },
+      {
+        "t": "Edit the active network",
+        "b": "Tap (i) / gear on the connected network → Advanced or Proxy."
+      },
+      {
+        "t": "Choose Manual proxy",
+        "b": "Set proxy type to Manual (not PAC)."
+      },
+      {
+        "t": "Enter server and port",
+        "b": "Hostname = PC IP shown above. Port = proxy port (usually 8080)."
+      },
+      {
+        "t": "Save and test",
+        "b": "Save settings. DPIReaper must stay connected on the PC."
+      }
+    ]
+  },
+  "fr": {
+    "title": "Se connecter à DPIReaper",
+    "subtitle": "Set up this phone or tablet to use DPIReaper on your PC.",
+    "tabPac": "Configuration PAC",
+    "tabManual": "Proxy manuel",
+    "pacIntro": "Recommended for iPhone and Android. The device downloads proxy rules automatically from the PAC URL.",
+    "manualIntro": "Use when PAC is not supported. Enter the PC hostname and proxy port manually.",
+    "pacUrlLabel": "PAC URL",
+    "hostLabel": "Hostname / IP",
+    "portLabel": "Port",
+    "footerTitle": "Si DPIReaper se déconnecte",
+    "footerText": "Coupez puis réactivez le Wi-Fi une fois si les apps ne chargent plus.",
+    "copied": "Copié",
+    "pacSteps": [
+      {
+        "t": "Copy the PAC URL",
+        "b": "Tap the copy icon next to the address above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi (or Network) on your phone or tablet."
+      },
+      {
+        "t": "Open your network details",
+        "b": "Tap the (i) or gear icon on the Wi-Fi network you are connected to."
+      },
+      {
+        "t": "Set proxy to Automatic / PAC",
+        "b": "Android: Proxy → Automatic. iOS: Configure Proxy → Automatic."
+      },
+      {
+        "t": "Paste the PAC URL",
+        "b": "Paste the copied address, save, and leave DPIReaper connected on the PC while testing."
+      },
+      {
+        "t": "Verify",
+        "b": "Open a browser and visit a site that was blocked before."
+      }
+    ],
+    "manualSteps": [
+      {
+        "t": "Copy hostname and port",
+        "b": "Use the copy icons next to each value above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi on your device."
+      },
+      {
+        "t": "Edit the active network",
+        "b": "Tap (i) / gear on the connected network → Advanced or Proxy."
+      },
+      {
+        "t": "Choose Manual proxy",
+        "b": "Set proxy type to Manual (not PAC)."
+      },
+      {
+        "t": "Enter server and port",
+        "b": "Hostname = PC IP shown above. Port = proxy port (usually 8080)."
+      },
+      {
+        "t": "Save and test",
+        "b": "Save settings. DPIReaper must stay connected on the PC."
+      }
+    ]
+  },
+  "es": {
+    "title": "Conectar a DPIReaper",
+    "subtitle": "Set up this phone or tablet to use DPIReaper on your PC.",
+    "tabPac": "Configuración PAC",
+    "tabManual": "Proxy manual",
+    "pacIntro": "Recommended for iPhone and Android. The device downloads proxy rules automatically from the PAC URL.",
+    "manualIntro": "Use when PAC is not supported. Enter the PC hostname and proxy port manually.",
+    "pacUrlLabel": "PAC URL",
+    "hostLabel": "Hostname / IP",
+    "portLabel": "Port",
+    "footerTitle": "Si DPIReaper se desconecta",
+    "footerText": "Desactiva y activa el Wi-Fi una vez si las apps dejan de cargar.",
+    "copied": "Copiado",
+    "pacSteps": [
+      {
+        "t": "Copy the PAC URL",
+        "b": "Tap the copy icon next to the address above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi (or Network) on your phone or tablet."
+      },
+      {
+        "t": "Open your network details",
+        "b": "Tap the (i) or gear icon on the Wi-Fi network you are connected to."
+      },
+      {
+        "t": "Set proxy to Automatic / PAC",
+        "b": "Android: Proxy → Automatic. iOS: Configure Proxy → Automatic."
+      },
+      {
+        "t": "Paste the PAC URL",
+        "b": "Paste the copied address, save, and leave DPIReaper connected on the PC while testing."
+      },
+      {
+        "t": "Verify",
+        "b": "Open a browser and visit a site that was blocked before."
+      }
+    ],
+    "manualSteps": [
+      {
+        "t": "Copy hostname and port",
+        "b": "Use the copy icons next to each value above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi on your device."
+      },
+      {
+        "t": "Edit the active network",
+        "b": "Tap (i) / gear on the connected network → Advanced or Proxy."
+      },
+      {
+        "t": "Choose Manual proxy",
+        "b": "Set proxy type to Manual (not PAC)."
+      },
+      {
+        "t": "Enter server and port",
+        "b": "Hostname = PC IP shown above. Port = proxy port (usually 8080)."
+      },
+      {
+        "t": "Save and test",
+        "b": "Save settings. DPIReaper must stay connected on the PC."
+      }
+    ]
+  },
+  "it": {
+    "title": "Connetti a DPIReaper",
+    "subtitle": "Set up this phone or tablet to use DPIReaper on your PC.",
+    "tabPac": "Configurazione PAC",
+    "tabManual": "Proxy manuale",
+    "pacIntro": "Recommended for iPhone and Android. The device downloads proxy rules automatically from the PAC URL.",
+    "manualIntro": "Use when PAC is not supported. Enter the PC hostname and proxy port manually.",
+    "pacUrlLabel": "PAC URL",
+    "hostLabel": "Hostname / IP",
+    "portLabel": "Port",
+    "footerTitle": "When DPIReaper disconnects",
+    "footerText": "If apps stop loading, turn Wi-Fi off and on once on this device. No need to change settings again when you reconnect.",
+    "copied": "Copiato",
+    "pacSteps": [
+      {
+        "t": "Copy the PAC URL",
+        "b": "Tap the copy icon next to the address above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi (or Network) on your phone or tablet."
+      },
+      {
+        "t": "Open your network details",
+        "b": "Tap the (i) or gear icon on the Wi-Fi network you are connected to."
+      },
+      {
+        "t": "Set proxy to Automatic / PAC",
+        "b": "Android: Proxy → Automatic. iOS: Configure Proxy → Automatic."
+      },
+      {
+        "t": "Paste the PAC URL",
+        "b": "Paste the copied address, save, and leave DPIReaper connected on the PC while testing."
+      },
+      {
+        "t": "Verify",
+        "b": "Open a browser and visit a site that was blocked before."
+      }
+    ],
+    "manualSteps": [
+      {
+        "t": "Copy hostname and port",
+        "b": "Use the copy icons next to each value above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi on your device."
+      },
+      {
+        "t": "Edit the active network",
+        "b": "Tap (i) / gear on the connected network → Advanced or Proxy."
+      },
+      {
+        "t": "Choose Manual proxy",
+        "b": "Set proxy type to Manual (not PAC)."
+      },
+      {
+        "t": "Enter server and port",
+        "b": "Hostname = PC IP shown above. Port = proxy port (usually 8080)."
+      },
+      {
+        "t": "Save and test",
+        "b": "Save settings. DPIReaper must stay connected on the PC."
+      }
+    ]
+  },
+  "pt": {
+    "title": "Conectar ao DPIReaper",
+    "subtitle": "Set up this phone or tablet to use DPIReaper on your PC.",
+    "tabPac": "Configuração PAC",
+    "tabManual": "Proxy manual",
+    "pacIntro": "Recommended for iPhone and Android. The device downloads proxy rules automatically from the PAC URL.",
+    "manualIntro": "Use when PAC is not supported. Enter the PC hostname and proxy port manually.",
+    "pacUrlLabel": "PAC URL",
+    "hostLabel": "Hostname / IP",
+    "portLabel": "Port",
+    "footerTitle": "When DPIReaper disconnects",
+    "footerText": "If apps stop loading, turn Wi-Fi off and on once on this device. No need to change settings again when you reconnect.",
+    "copied": "Copiado",
+    "pacSteps": [
+      {
+        "t": "Copy the PAC URL",
+        "b": "Tap the copy icon next to the address above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi (or Network) on your phone or tablet."
+      },
+      {
+        "t": "Open your network details",
+        "b": "Tap the (i) or gear icon on the Wi-Fi network you are connected to."
+      },
+      {
+        "t": "Set proxy to Automatic / PAC",
+        "b": "Android: Proxy → Automatic. iOS: Configure Proxy → Automatic."
+      },
+      {
+        "t": "Paste the PAC URL",
+        "b": "Paste the copied address, save, and leave DPIReaper connected on the PC while testing."
+      },
+      {
+        "t": "Verify",
+        "b": "Open a browser and visit a site that was blocked before."
+      }
+    ],
+    "manualSteps": [
+      {
+        "t": "Copy hostname and port",
+        "b": "Use the copy icons next to each value above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi on your device."
+      },
+      {
+        "t": "Edit the active network",
+        "b": "Tap (i) / gear on the connected network → Advanced or Proxy."
+      },
+      {
+        "t": "Choose Manual proxy",
+        "b": "Set proxy type to Manual (not PAC)."
+      },
+      {
+        "t": "Enter server and port",
+        "b": "Hostname = PC IP shown above. Port = proxy port (usually 8080)."
+      },
+      {
+        "t": "Save and test",
+        "b": "Save settings. DPIReaper must stay connected on the PC."
+      }
+    ]
+  },
+  "ru": {
+    "title": "Подключение к DPIReaper",
+    "subtitle": "Set up this phone or tablet to use DPIReaper on your PC.",
+    "tabPac": "Настройка PAC",
+    "tabManual": "Ручной прокси",
+    "pacIntro": "Recommended for iPhone and Android. The device downloads proxy rules automatically from the PAC URL.",
+    "manualIntro": "Use when PAC is not supported. Enter the PC hostname and proxy port manually.",
+    "pacUrlLabel": "PAC URL",
+    "hostLabel": "Hostname / IP",
+    "portLabel": "Port",
+    "footerTitle": "Если DPIReaper отключится",
+    "footerText": "Выключите и включите Wi-Fi один раз, если приложения не загружаются.",
+    "copied": "Скопировано",
+    "pacSteps": [
+      {
+        "t": "Copy the PAC URL",
+        "b": "Tap the copy icon next to the address above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi (or Network) on your phone or tablet."
+      },
+      {
+        "t": "Open your network details",
+        "b": "Tap the (i) or gear icon on the Wi-Fi network you are connected to."
+      },
+      {
+        "t": "Set proxy to Automatic / PAC",
+        "b": "Android: Proxy → Automatic. iOS: Configure Proxy → Automatic."
+      },
+      {
+        "t": "Paste the PAC URL",
+        "b": "Paste the copied address, save, and leave DPIReaper connected on the PC while testing."
+      },
+      {
+        "t": "Verify",
+        "b": "Open a browser and visit a site that was blocked before."
+      }
+    ],
+    "manualSteps": [
+      {
+        "t": "Copy hostname and port",
+        "b": "Use the copy icons next to each value above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi on your device."
+      },
+      {
+        "t": "Edit the active network",
+        "b": "Tap (i) / gear on the connected network → Advanced or Proxy."
+      },
+      {
+        "t": "Choose Manual proxy",
+        "b": "Set proxy type to Manual (not PAC)."
+      },
+      {
+        "t": "Enter server and port",
+        "b": "Hostname = PC IP shown above. Port = proxy port (usually 8080)."
+      },
+      {
+        "t": "Save and test",
+        "b": "Save settings. DPIReaper must stay connected on the PC."
+      }
+    ]
+  },
+  "ar": {
+    "title": "الاتصال بـ DPIReaper",
+    "subtitle": "Set up this phone or tablet to use DPIReaper on your PC.",
+    "tabPac": "إعداد PAC",
+    "tabManual": "بروكسي يدوي",
+    "pacIntro": "Recommended for iPhone and Android. The device downloads proxy rules automatically from the PAC URL.",
+    "manualIntro": "Use when PAC is not supported. Enter the PC hostname and proxy port manually.",
+    "pacUrlLabel": "PAC URL",
+    "hostLabel": "Hostname / IP",
+    "portLabel": "Port",
+    "footerTitle": "عند انقطاع DPIReaper",
+    "footerText": "أوقف Wi-Fi ثم فعّله مرة واحدة إذا توقفت التطبيقات عن التحميل.",
+    "copied": "تم النسخ",
+    "pacSteps": [
+      {
+        "t": "Copy the PAC URL",
+        "b": "Tap the copy icon next to the address above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi (or Network) on your phone or tablet."
+      },
+      {
+        "t": "Open your network details",
+        "b": "Tap the (i) or gear icon on the Wi-Fi network you are connected to."
+      },
+      {
+        "t": "Set proxy to Automatic / PAC",
+        "b": "Android: Proxy → Automatic. iOS: Configure Proxy → Automatic."
+      },
+      {
+        "t": "Paste the PAC URL",
+        "b": "Paste the copied address, save, and leave DPIReaper connected on the PC while testing."
+      },
+      {
+        "t": "Verify",
+        "b": "Open a browser and visit a site that was blocked before."
+      }
+    ],
+    "manualSteps": [
+      {
+        "t": "Copy hostname and port",
+        "b": "Use the copy icons next to each value above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi on your device."
+      },
+      {
+        "t": "Edit the active network",
+        "b": "Tap (i) / gear on the connected network → Advanced or Proxy."
+      },
+      {
+        "t": "Choose Manual proxy",
+        "b": "Set proxy type to Manual (not PAC)."
+      },
+      {
+        "t": "Enter server and port",
+        "b": "Hostname = PC IP shown above. Port = proxy port (usually 8080)."
+      },
+      {
+        "t": "Save and test",
+        "b": "Save settings. DPIReaper must stay connected on the PC."
+      }
+    ]
+  },
+  "zh": {
+    "title": "连接 DPIReaper",
+    "subtitle": "Set up this phone or tablet to use DPIReaper on your PC.",
+    "tabPac": "PAC 配置",
+    "tabManual": "手动代理",
+    "pacIntro": "Recommended for iPhone and Android. The device downloads proxy rules automatically from the PAC URL.",
+    "manualIntro": "Use when PAC is not supported. Enter the PC hostname and proxy port manually.",
+    "pacUrlLabel": "PAC URL",
+    "hostLabel": "Hostname / IP",
+    "portLabel": "Port",
+    "footerTitle": "DPIReaper 断开时",
+    "footerText": "若应用无法加载，请关闭再打开 Wi-Fi 一次。",
+    "copied": "已复制",
+    "pacSteps": [
+      {
+        "t": "Copy the PAC URL",
+        "b": "Tap the copy icon next to the address above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi (or Network) on your phone or tablet."
+      },
+      {
+        "t": "Open your network details",
+        "b": "Tap the (i) or gear icon on the Wi-Fi network you are connected to."
+      },
+      {
+        "t": "Set proxy to Automatic / PAC",
+        "b": "Android: Proxy → Automatic. iOS: Configure Proxy → Automatic."
+      },
+      {
+        "t": "Paste the PAC URL",
+        "b": "Paste the copied address, save, and leave DPIReaper connected on the PC while testing."
+      },
+      {
+        "t": "Verify",
+        "b": "Open a browser and visit a site that was blocked before."
+      }
+    ],
+    "manualSteps": [
+      {
+        "t": "Copy hostname and port",
+        "b": "Use the copy icons next to each value above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi on your device."
+      },
+      {
+        "t": "Edit the active network",
+        "b": "Tap (i) / gear on the connected network → Advanced or Proxy."
+      },
+      {
+        "t": "Choose Manual proxy",
+        "b": "Set proxy type to Manual (not PAC)."
+      },
+      {
+        "t": "Enter server and port",
+        "b": "Hostname = PC IP shown above. Port = proxy port (usually 8080)."
+      },
+      {
+        "t": "Save and test",
+        "b": "Save settings. DPIReaper must stay connected on the PC."
+      }
+    ]
+  },
+  "ja": {
+    "title": "DPIReaper に接続",
+    "subtitle": "Set up this phone or tablet to use DPIReaper on your PC.",
+    "tabPac": "PAC 設定",
+    "tabManual": "手動プロキシ",
+    "pacIntro": "Recommended for iPhone and Android. The device downloads proxy rules automatically from the PAC URL.",
+    "manualIntro": "Use when PAC is not supported. Enter the PC hostname and proxy port manually.",
+    "pacUrlLabel": "PAC URL",
+    "hostLabel": "Hostname / IP",
+    "portLabel": "Port",
+    "footerTitle": "DPIReaper が切断された場合",
+    "footerText": "アプリが読み込めない場合は Wi-Fi を一度オフ/on してください。",
+    "copied": "コピーしました",
+    "pacSteps": [
+      {
+        "t": "Copy the PAC URL",
+        "b": "Tap the copy icon next to the address above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi (or Network) on your phone or tablet."
+      },
+      {
+        "t": "Open your network details",
+        "b": "Tap the (i) or gear icon on the Wi-Fi network you are connected to."
+      },
+      {
+        "t": "Set proxy to Automatic / PAC",
+        "b": "Android: Proxy → Automatic. iOS: Configure Proxy → Automatic."
+      },
+      {
+        "t": "Paste the PAC URL",
+        "b": "Paste the copied address, save, and leave DPIReaper connected on the PC while testing."
+      },
+      {
+        "t": "Verify",
+        "b": "Open a browser and visit a site that was blocked before."
+      }
+    ],
+    "manualSteps": [
+      {
+        "t": "Copy hostname and port",
+        "b": "Use the copy icons next to each value above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi on your device."
+      },
+      {
+        "t": "Edit the active network",
+        "b": "Tap (i) / gear on the connected network → Advanced or Proxy."
+      },
+      {
+        "t": "Choose Manual proxy",
+        "b": "Set proxy type to Manual (not PAC)."
+      },
+      {
+        "t": "Enter server and port",
+        "b": "Hostname = PC IP shown above. Port = proxy port (usually 8080)."
+      },
+      {
+        "t": "Save and test",
+        "b": "Save settings. DPIReaper must stay connected on the PC."
+      }
+    ]
+  },
+  "ko": {
+    "title": "DPIReaper 연결",
+    "subtitle": "Set up this phone or tablet to use DPIReaper on your PC.",
+    "tabPac": "PAC 설정",
+    "tabManual": "수동 프록시",
+    "pacIntro": "Recommended for iPhone and Android. The device downloads proxy rules automatically from the PAC URL.",
+    "manualIntro": "Use when PAC is not supported. Enter the PC hostname and proxy port manually.",
+    "pacUrlLabel": "PAC URL",
+    "hostLabel": "Hostname / IP",
+    "portLabel": "Port",
+    "footerTitle": "DPIReaper 연결이 끊기면",
+    "footerText": "앱이 로드되지 않으면 Wi-Fi를 한 번 껐다 켜세요.",
+    "copied": "복사됨",
+    "pacSteps": [
+      {
+        "t": "Copy the PAC URL",
+        "b": "Tap the copy icon next to the address above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi (or Network) on your phone or tablet."
+      },
+      {
+        "t": "Open your network details",
+        "b": "Tap the (i) or gear icon on the Wi-Fi network you are connected to."
+      },
+      {
+        "t": "Set proxy to Automatic / PAC",
+        "b": "Android: Proxy → Automatic. iOS: Configure Proxy → Automatic."
+      },
+      {
+        "t": "Paste the PAC URL",
+        "b": "Paste the copied address, save, and leave DPIReaper connected on the PC while testing."
+      },
+      {
+        "t": "Verify",
+        "b": "Open a browser and visit a site that was blocked before."
+      }
+    ],
+    "manualSteps": [
+      {
+        "t": "Copy hostname and port",
+        "b": "Use the copy icons next to each value above."
+      },
+      {
+        "t": "Open Wi-Fi settings",
+        "b": "Settings → Wi-Fi on your device."
+      },
+      {
+        "t": "Edit the active network",
+        "b": "Tap (i) / gear on the connected network → Advanced or Proxy."
+      },
+      {
+        "t": "Choose Manual proxy",
+        "b": "Set proxy type to Manual (not PAC)."
+      },
+      {
+        "t": "Enter server and port",
+        "b": "Hostname = PC IP shown above. Port = proxy port (usually 8080)."
+      },
+      {
+        "t": "Save and test",
+        "b": "Save settings. DPIReaper must stay connected on the PC."
+      }
+    ]
+  }
+}

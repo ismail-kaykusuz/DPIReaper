@@ -2,7 +2,11 @@
 // DPIReaper — Merkezi Sabitler
 // ============================================================
 
-export const URLS = {};
+export const URLS = {
+  github: 'https://github.com/ParzivaL3441/DPIReaper',
+  discord: 'https://discord.gg/5jyWc3RSvk',
+  patreon: 'https://www.patreon.com/cw/DPIReaper',
+};
 
 export const DNS_MAP = {
   system: null,
@@ -21,10 +25,13 @@ export const DOH_MAP = {
   opendns: "https://208.67.222.222/dns-query",
 };
 
+const APP_VERSION = "1.0.0";
+
 export const APP = {
   name: "DPIReaper",
-  logo: "/dpireaper-logo.png",
-  version: "1.0.0",
+  // B16: Cache-bust ile yeni sürümde Tauri WebView eski logoyu cache'lemesin
+  logo: `/dpireaper-logo.png?v=${APP_VERSION}`,
+  version: APP_VERSION,
   designWidth: 380,
   designHeight: 700,
   maxLogs: 100,
@@ -36,7 +43,11 @@ export const APP = {
 export const LS_KEYS = {
   config: "dpireaper_config",
   firstRun: "dpireaper_first_run_done",
-  defenderExclusionAdded: "dpireaper_defender_exclusion_added",
+  // Defender consent: 'added' | 'declined' | null (henüz sorulmadı)
+  defenderExclusionDecision: "dpireaper_defender_exclusion_decision",
+  ispCache: "dpireaper_isp_cache",
+  onboardingDone: "dpireaper_onboarding_done",
+  lang: "dpireaper_lang",
 };
 
 export const RETRY_DELAYS = [2500, 3000, 6000, 12000, 20000];

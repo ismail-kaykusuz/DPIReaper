@@ -1,7 +1,6 @@
 import React from 'react';
-import { AlertCircle, RotateCcw, Sparkles, ShieldCheck } from 'lucide-react';
+import { AlertCircle, RotateCcw, Sparkles } from 'lucide-react';
 import {
-  LOW_CPU_MIN_CHUNK,
   PROFILE_TIER_ORDER,
   DEFAULT_PROFILE_TIER,
   profilePatch,
@@ -16,6 +15,7 @@ const ConnectionProfilePicker = ({ config, updateConfig, t, compact = false, isp
     return {
       tier,
       name: t[`profile${key}Name`] || tier,
+      desc: t[`profile${key}Desc`] || '',
       recommended: tier === DEFAULT_PROFILE_TIER,
       ispSuggested: suggestedTier === tier,
     };
@@ -24,9 +24,6 @@ const ConnectionProfilePicker = ({ config, updateConfig, t, compact = false, isp
   const handleSelect = (tier) => {
     const patch = profilePatch(tier);
     if (!patch) return;
-    if (config.lowCpuMode && patch.dpiMethod !== '0') {
-      patch.httpsChunkSize = Math.max(Number(patch.httpsChunkSize), LOW_CPU_MIN_CHUNK);
-    }
     updateConfig(patch);
   };
 
@@ -74,14 +71,24 @@ const ConnectionProfilePicker = ({ config, updateConfig, t, compact = false, isp
           </div>
         </div>
       )}
-      <div className="v2-card">
+      <div className="v2-card" role="radiogroup" aria-label={t.sectionConnectionProfile}>
         {rows.map((row, idx) => {
           const isSelected = activeTier === row.tier;
           return (
             <React.Fragment key={row.tier}>
               <div
+                role="radio"
+                tabIndex={0}
+                aria-checked={isSelected}
+                aria-label={row.name}
                 className={`v2-item hover-effect ${isSelected ? 'v2-selected' : ''}`}
                 onClick={() => handleSelect(row.tier)}
+                onKeyDown={(e) => {
+                  if (e.key === ' ' || e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSelect(row.tier);
+                  }
+                }}
               >
                 <div className="v2-item-text">
                   <h3>
@@ -93,6 +100,7 @@ const ConnectionProfilePicker = ({ config, updateConfig, t, compact = false, isp
                       <span className="profile-badge-recommended">{t.profileRecommendedBadge}</span>
                     )}
                   </h3>
+                  {row.desc && <p>{row.desc}</p>}
                 </div>
                 <div className={`v2-radio ${isSelected ? 'on' : ''}`}>
                   {isSelected && <div className="v2-radio-dot" />}
@@ -102,10 +110,6 @@ const ConnectionProfilePicker = ({ config, updateConfig, t, compact = false, isp
             </React.Fragment>
           );
         })}
-      </div>
-      <div className="profile-defender-note">
-        <ShieldCheck size={13} strokeWidth={2.2} />
-        <span>{t.profileDefenderBadge}</span>
       </div>
       {activeTier === null && compact && (
         <div className="info-banner" style={{ marginTop: 8 }}>

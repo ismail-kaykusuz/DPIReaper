@@ -1,14 +1,16 @@
 import Settings, { ConnectionProfilePicker } from "./Settings";
 import BypassGraph from "./components/BypassGraph";
+import DefenderConsentModal from "./overlays/DefenderConsentModal";
+import LanguagePicker from "./overlays/LanguagePicker";
 import { createBypassStatsTracker } from "./bypassStats";
 import { detectProfileTier } from "./profiles";
 import { motion, AnimatePresence } from "framer-motion";
 // autostart importları Settings.jsx'te kullanılıyor, burada gerek yok
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Command } from "@tauri-apps/plugin-shell";
+import { Command, open as openShell } from "@tauri-apps/plugin-shell";
 import { invoke } from "@tauri-apps/api/core";
-import { getTranslations } from "./i18n";
-import { DNS_MAP, DOH_MAP, APP, RETRY_DELAYS, DPI_TIMEOUTS, LS_KEYS } from "./constants";
+import { getTranslations, detectSystemLang } from "./i18n";
+import { DNS_MAP, DOH_MAP, APP, RETRY_DELAYS, DPI_TIMEOUTS, LS_KEYS, URLS } from "./constants";
 import { buildProxyEngineArgs } from "./profiles";
 
 // Re-add missing imports
@@ -16,17 +18,17 @@ import DOMPurify from "dompurify";
 import {
   Power,
   Shield,
-  Settings as SettingsIcon,
+  SlidersHorizontal,
+  ScrollText,
   FileText,
   X,
   Copy,
   Trash2,
   WifiOff,
-  Globe,
   Smartphone,
   AlertTriangle,
   Check,
-  ZoomIn,
+  Heart,
 } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
@@ -34,7 +36,6 @@ import {
   isPermissionGranted,
   requestPermission,
   sendNotification,
-  onAction,
 } from "@tauri-apps/plugin-notification";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -51,20 +52,7 @@ function App() {
   const currentPortRef = useRef(8080); // ✅ #6: Stale closure önleme
   const [lanIp, setLanIp] = useState("127.0.0.1"); // ✅ LAN IP State
   const [pacPort, setPacPort] = useState(8787); // ✅ PAC port (dinamik)
-  const [showConnectionModal, setShowConnectionModal] = useState(false); // ✅ Modal State
-  const [connectionModalTab, setConnectionModalTab] = useState("pac"); // pac | manual
-  const [copiedField, setCopiedField] = useState(null);
-  const [showLargeQr, setShowLargeQr] = useState(false);
-
-  const handleCopyField = async (text, fieldName) => {
-    try {
-      await writeText(text);
-      setCopiedField(fieldName);
-      setTimeout(() => setCopiedField(null), 1500);
-    } catch (e) {
-      console.error("Copy failed:", e);
-    }
-  };
+  const [showConnectionModal, setShowConnectionModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [logFilter, setLogFilter] = useState('all'); // Faz 4 — günlük filtresi
@@ -76,7 +64,22 @@ function App() {
   const [closingStep, setClosingStep] = useState(0);
   const [closingDots, setClosingDots] = useState("");
   const [ispDetection, setIspDetection] = useState(null);
+  // ✅ İlk giriş overlay state — config bile yoksa göster (A12 double-guard)
+  // Bu state, aşağıdaki useEffect dependency array'leri bu değeri okuduğu için
+  // erken declare edilmek zorunda (yoksa TDZ ReferenceError → siyah ekran).
+  const [showFirstRunISS, setShowFirstRunISS] = useState(() => {
+    return !localStorage.getItem(LS_KEYS.firstRun) && !localStorage.getItem(LS_KEYS.config);
+  });
+  // Defender consent durumu — 'added' | 'declined' | null (henüz sorulmadı)
+  const [defenderDecision, setDefenderDecision] = useState(() =>
+    localStorage.getItem(LS_KEYS.defenderExclusionDecision)
+  );
+  const [showDefenderConsent, setShowDefenderConsent] = useState(false);
   const [bypassStats, setBypassStats] = useState(null);
+  // C5: Sidecar sağlık durumu — { ok: bool, latencyMs: number } | null
+  const [healthStatus, setHealthStatus] = useState(null);
+  // C6: Onboarding adımı (0/1/2)
+  const [onboardingStep, setOnboardingStep] = useState(0);
   const bypassTrackerRef = useRef(null);
   const bypassPendingRef = useRef(null);
   const bypassFlushTimerRef = useRef(null);
@@ -102,9 +105,29 @@ function App() {
       bypassTrackerRef.current = createBypassStatsTracker();
       setBypassStats(bypassTrackerRef.current.snapshot());
     }
-    invoke("detect_isp")
-      .then((result) => setIspDetection(result))
-      .catch(() => setIspDetection(null));
+    // B3: ISS tespiti — 24 saatlik cache, yoksa async invoke
+    try {
+      const cached = localStorage.getItem(LS_KEYS.ispCache);
+      if (cached) {
+        const obj = JSON.parse(cached);
+        if (obj?.ts && Date.now() - obj.ts < 24 * 60 * 60 * 1000) {
+          setIspDetection(obj.result || null);
+        } else {
+          throw new Error('expired');
+        }
+      } else {
+        throw new Error('miss');
+      }
+    } catch (_) {
+      invoke("detect_isp")
+        .then((result) => {
+          setIspDetection(result);
+          try {
+            localStorage.setItem(LS_KEYS.ispCache, JSON.stringify({ result, ts: Date.now() }));
+          } catch (_) {}
+        })
+        .catch(() => setIspDetection(null));
+    }
     return () => {
       if (bypassFlushTimerRef.current) clearTimeout(bypassFlushTimerRef.current);
       if (logFlushRafRef.current) cancelAnimationFrame(logFlushRafRef.current);
@@ -138,6 +161,96 @@ function App() {
     };
   }, [isConnected]);
 
+  // C5: Sidecar sağlık kontrolü — bağlandıktan sonra 5sn'de ilk test, sonra 30sn'de bir
+  useEffect(() => {
+    if (!isConnected) {
+      setHealthStatus(null);
+      return undefined;
+    }
+    let cancelled = false;
+    const runCheck = async () => {
+      try {
+        const res = await invoke('check_proxy_health', { proxyPort: currentPortRef.current });
+        if (!cancelled) {
+          // res: { ok: bool, latencyMs: number }
+          setHealthStatus(res || { ok: false, latencyMs: 0 });
+          if (res && res.ok === false) {
+            addLog(t.logHealthFail, 'warn', { i18nKey: 'logHealthFail' });
+          }
+        }
+      } catch (_) { /* sessizce yut */ }
+    };
+    const firstId = setTimeout(runCheck, 5000);
+    const intervalId = setInterval(runCheck, 30000);
+    return () => {
+      cancelled = true;
+      clearTimeout(firstId);
+      clearInterval(intervalId);
+    };
+  }, [isConnected]);
+
+  // C14: Mount'ta sidecar binary varlığını doğrula
+  useEffect(() => {
+    invoke('check_sidecar_exists').then((exists) => {
+      if (!exists) {
+        addLog(t.logSidecarMissing, 'error', { i18nKey: 'logSidecarMissing' });
+      }
+    }).catch(() => {});
+  }, []);
+
+  // Madde 1: --autostart ile başlatıldıysa pencereyi tray'e gizle.
+  // Kullanıcı `startHidden` ayarını kapatırsa pencere normal şekilde görünür.
+  useEffect(() => {
+    invoke('is_autostarted').then((auto) => {
+      if (!auto) return;
+      if (configRef.current?.startHidden === false) return;
+      try {
+        getCurrentWindow().hide().catch(() => {});
+      } catch (_) { /* sessizce yut */ }
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Defender consent modal: onboarding tamamlanmış ve henüz karar verilmemişse göster
+  useEffect(() => {
+    if (showFirstRunISS) return;
+    if (!isAdmin) return;
+    if (defenderDecision === 'added' || defenderDecision === 'declined') return;
+    setShowDefenderConsent(true);
+  }, [showFirstRunISS, isAdmin, defenderDecision]);
+
+  const handleDefenderConsentAccept = async () => {
+    try {
+      await invoke('add_defender_exclusions');
+      localStorage.setItem(LS_KEYS.defenderExclusionDecision, 'added');
+      setDefenderDecision('added');
+      setShowDefenderConsent(false);
+    } catch (e) {
+      // UAC reddi veya başka bir hata — flag SET ETME, modal sonraki açılışta tekrar çıkar
+      addLog(t.logDefenderExclusionFailed, 'warn', { i18nKey: 'logDefenderExclusionFailed' });
+      setShowDefenderConsent(false);
+    }
+  };
+
+  const handleDefenderConsentDecline = () => {
+    localStorage.setItem(LS_KEYS.defenderExclusionDecision, 'declined');
+    setDefenderDecision('declined');
+    setShowDefenderConsent(false);
+  };
+
+  // Settings içinden Defender bölümü "İstisnayı Şimdi Ekle" butonu için
+  const requestDefenderExclusion = async () => {
+    try {
+      await invoke('add_defender_exclusions');
+      localStorage.setItem(LS_KEYS.defenderExclusionDecision, 'added');
+      setDefenderDecision('added');
+      return true;
+    } catch (e) {
+      addLog(t.logDefenderExclusionFailed, 'warn', { i18nKey: 'logDefenderExclusionFailed' });
+      return false;
+    }
+  };
+
   useEffect(() => {
     if (appIsClosingState) {
       const stepTimer = setTimeout(() => {
@@ -169,7 +282,7 @@ function App() {
         setIsAdmin(true);
       });
 
-    // ✅ Internet Connection Listeners
+      // ✅ Internet Connection Listeners
     const handleOnline = () => {
       setIsOnline(true);
       addLog(t.logInternetBack, "success", { i18nKey: "logInternetBack" });
@@ -182,38 +295,17 @@ function App() {
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
-    // ✅ Bildirime tıklanınca uygulamayı öne getir
-    let unlistenNotificationAction = null;
-    const setupNotificationListener = async () => {
-      try {
-        unlistenNotificationAction = await onAction((notification) => {
-          getCurrentWindow().show();
-          getCurrentWindow().setFocus();
-        });
-      } catch (err) {
-        console.error("Failed to setup notification listener:", err);
-      }
-    };
-    setupNotificationListener();
-
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
-      if (unlistenNotificationAction) {
-        unlistenNotificationAction();
-      }
     };
   }, []);
 
   // Settings State
-  // ✅ İlk giriş overlay state
-  const [showFirstRunISS, setShowFirstRunISS] = useState(() => {
-    return !localStorage.getItem(LS_KEYS.firstRun);
-  });
-
   const [config, setConfig] = useState(() => {
     const defaultSettings = {
-      language: "tr",
+      // Madde 5: İlk açılışta sistem dilini otomatik tespit et (EN fallback)
+      language: detectSystemLang(),
       autoStart: false,
       autoConnect: false,
       minimizeToTray: false,
@@ -221,22 +313,21 @@ function App() {
       dnsMode: "auto",
       selectedDns: "cloudflare",
       autoReconnect: true,
-      // Faz 3 — Varsayılan: Önerilen profil (mid / mode 1 / chunk 2)
       dpiMethod: "1",
       httpsChunkSize: 2,
-      lowCpuMode: false,
       ipv4Only: true,
       enableWinhttp: true,
       selectedIspProfile: "mid",
+      customBypassDomains: [],
+      startHidden: true,
     };
 
     const saved = localStorage.getItem(LS_KEYS.config);
     if (saved) {
       try {
-        // P1-FIX: LocalStorage Obfuscation (Uyumluluk için önce düz metin mi kontrol et)
         let parsedStr = saved;
         if (!saved.startsWith("{")) {
-          parsedStr = decodeURIComponent(escape(atob(saved))); // Geriye dönük uyumluluk (eski config)
+          parsedStr = decodeURIComponent(escape(atob(saved)));
         }
         const parsed = JSON.parse(parsedStr);
         if (typeof parsed !== 'object' || parsed === null) return defaultSettings;
@@ -249,15 +340,30 @@ function App() {
           migratedMode = 'auto';
         }
 
-        // P1-FIX: Load esnasında Sidecar Injection'u engellemek için tip güvenlik (Config Validation)
-        // ✅ FIX: httpsChunkSize artık 1 ve 2 değerlerini de kabul ediyor (ISS profil değerleri)
+        // Migration: 8-byte ve üstü chunk seçenekleri tasarımdan kaldırıldı (sadece 1/2/4).
+        let migratedChunk = Number(parsed.httpsChunkSize);
+        if ([1, 2, 4].includes(migratedChunk)) {
+          // tut
+        } else if (migratedChunk > 4) {
+          migratedChunk = 4;
+        } else {
+          migratedChunk = defaultSettings.httpsChunkSize;
+        }
+
+        // Migration (A6): lowCpuMode artık yok, sil
+        // eslint-disable-next-line no-unused-vars
+        const { lowCpuMode: _legacyLowCpu, advancedBypass: _legacyAdv, ...rest } = parsed;
+
         return {
           ...defaultSettings,
-          ...parsed,
+          ...rest,
           dpiMethod: ['0', '1', '2'].includes(String(parsed.dpiMethod)) ? String(parsed.dpiMethod) : defaultSettings.dpiMethod,
-          httpsChunkSize: [1, 2, 4, 8, 16, 32, 64, 128].includes(Number(parsed.httpsChunkSize)) ? Number(parsed.httpsChunkSize) : defaultSettings.httpsChunkSize,
+          httpsChunkSize: migratedChunk,
           selectedDns: typeof migratedDns === 'string' ? migratedDns : defaultSettings.selectedDns,
           dnsMode: typeof migratedMode === 'string' ? migratedMode : defaultSettings.dnsMode,
+          customBypassDomains: Array.isArray(parsed.customBypassDomains)
+            ? parsed.customBypassDomains.filter((d) => typeof d === 'string')
+            : [],
         };
       } catch (e) {
         console.error("Failed to parse config:", e);
@@ -296,6 +402,16 @@ function App() {
 
   // DNS_MAP ve DOH_MAP artık component dışında tanımlı (yukarıda)
 
+  // B9: localStorage yazımı 200ms debounce — hızlı toggle tıklamalarında biriktir.
+  const configWriteTimerRef = useRef(null);
+  const pendingConfigRef = useRef(null);
+  const flushConfigToStorage = (cfg) => {
+    try {
+      localStorage.setItem(LS_KEYS.config, JSON.stringify(cfg));
+    } catch (e) {
+      console.error("Config write failed:", e);
+    }
+  };
   const updateConfig = (keyOrObj, value) => {
     setConfig((prev) => {
       let newConfig;
@@ -304,10 +420,28 @@ function App() {
       } else {
         newConfig = { ...prev, [keyOrObj]: value };
       }
-      // P1-FIX: Base64 kodlaması kaldırıldı, plaintext validasyonlu yazılıyor
-      localStorage.setItem(LS_KEYS.config, JSON.stringify(newConfig));
+      pendingConfigRef.current = newConfig;
+      if (configWriteTimerRef.current) clearTimeout(configWriteTimerRef.current);
+      configWriteTimerRef.current = setTimeout(() => {
+        configWriteTimerRef.current = null;
+        if (pendingConfigRef.current) {
+          flushConfigToStorage(pendingConfigRef.current);
+          pendingConfigRef.current = null;
+        }
+      }, 200);
       return newConfig;
     });
+  };
+  // Uygulama kapanırken pending config'i sync yaz
+  const flushPendingConfig = () => {
+    if (configWriteTimerRef.current) {
+      clearTimeout(configWriteTimerRef.current);
+      configWriteTimerRef.current = null;
+    }
+    if (pendingConfigRef.current) {
+      flushConfigToStorage(pendingConfigRef.current);
+      pendingConfigRef.current = null;
+    }
   };
 
   // Custom Confirm State
@@ -416,23 +550,26 @@ function App() {
     }
   };
 
-  // Dil değiştiğinde i18n loglarını güncelle
-  useEffect(() => {
-    setLogs((prev) =>
-      prev.map((log) => {
-        if (!log.i18nKey) return log;
-        const msg = resolveI18nMessage(log.i18nKey, log.i18nParams || []);
-        return { ...log, msg };
-      }),
-    );
-  }, [t]);
+  // B8: Dil değiştiğinde tüm log array'ini map'lemek yerine render anında çöz.
+  const getLogText = (log) => {
+    if (!log) return "";
+    if (log.i18nKey) {
+      const v = t[log.i18nKey];
+      if (typeof v === 'function') {
+        try { return v(...(log.i18nParams || [])); }
+        catch (e) { return log.msg || ""; }
+      }
+      if (typeof v === 'string') return v;
+    }
+    return log.msg || "";
+  };
 
   const [copyStatus, setCopyStatus] = useState("idle"); // idle, success, error
 
   const copyLogs = async () => {
     if (logs.length === 0) return;
 
-    const logText = logs.map((l) => `[${l.time}] ${l.msg}`).join("\n");
+    const logText = logs.map((l) => `[${l.time}] ${getLogText(l)}`).join("\n");
 
     try {
       await writeText(logText);
@@ -481,15 +618,11 @@ function App() {
     try {
       let tooltip = "";
       switch (status) {
-        case "connected":
-          const selectedDns = configRef.current.selectedDns;
-          const dnsName = DNS_MAP[selectedDns]
-            ? Object.keys(DNS_MAP)
-                .find((key) => DNS_MAP[key] === DNS_MAP[selectedDns])
-                ?.toUpperCase()
-            : "SYSTEM";
+        case "connected": {
+          const dnsName = (configRef.current.selectedDns || "auto").toUpperCase();
           tooltip = `🟢 DPIReaper - ${t.statusConnected}\n127.0.0.1:${currentPortRef.current}\nDNS: ${dnsName}`;
           break;
+        }
         case "disconnected":
           tooltip = `🔴 DPIReaper - ${t.statusInactive}`;
           break;
@@ -521,9 +654,9 @@ function App() {
 
     if (currentAttempt >= maxAttempts) {
       // Maksimum deneme aşıldı
-      addLog(`=4 ${t.logMaxRetries}`, "error", { i18nKey: "logMaxRetries" });
+      addLog(`❌ ${t.logMaxRetries}`, "error", { i18nKey: "logMaxRetries" });
       addLog("", "info");
-      addLog(`=� ${t.logPossibleReasons}`, "warn", {
+      addLog(`📋 ${t.logPossibleReasons}`, "warn", {
         i18nKey: "logPossibleReasons",
       });
       addLog(`  • ${t.logReasonInternet}`, "info", {
@@ -534,7 +667,7 @@ function App() {
       });
       addLog(`  • ${t.logReasonPorts}`, "info", { i18nKey: "logReasonPorts" });
       addLog("", "info");
-      addLog(`=� ${t.logSolutions}`, "warn", { i18nKey: "logSolutions" });
+      addLog(`💡 ${t.logSolutions}`, "warn", { i18nKey: "logSolutions" });
       addLog(`  • ${t.logSolInternet}`, "info", { i18nKey: "logSolInternet" });
       addLog(`  • ${t.logSolFirewall}`, "info", { i18nKey: "logSolFirewall" });
       addLog(`  • ${t.logSolAdmin}`, "info", { i18nKey: "logSolAdmin" });
@@ -663,12 +796,9 @@ function App() {
 
       const listenAddr = `${bindAddr}:${port}`;
       const dohUrl = DOH_MAP[currentDns];
-      // Npcap sürücüsü artık UI'dan kaldırıldı — her zaman chunk-only stratejisi
-      const hasDriver = false;
 
       const { args, logs: engineLogs } = buildProxyEngineArgs({
         config: configRef.current,
-        hasDriver,
         listenAddr,
         timeoutMs: TIMEOUT_MS,
         currentDns,
@@ -732,15 +862,6 @@ function App() {
         let friendlyKey = null;
         let friendlyParams = [];
 
-        const isWpcapError =
-          lowerLine.includes("couldn't load wpcap.dll") ||
-          lowerLine.includes("error starting network detector");
-
-        if (isWpcapError) {
-          fatalErrorRef.current = true;
-          friendlyKey = "logWpcapMissing";
-        }
-
         // Port hatası (sadece gerçekten "in use" hatalarında tetikle)
         const isPortInUse =
           (lowerLine.includes("bind") || lowerLine.includes("yuva adresi")) &&
@@ -766,11 +887,8 @@ function App() {
 
         if (friendlyKey) {
           const msg = resolveI18nMessage(friendlyKey, friendlyParams);
-          // Her mesaj tipine uygun renk ata
           let logType = "info";
-          if (friendlyKey === "logWpcapMissing") {
-            logType = "error";
-          } else if (friendlyKey === "logPortBusy") {
+          if (friendlyKey === "logPortBusy") {
             logType = "warn";
           } else if (friendlyKey === "logSpoofReady" || friendlyKey === "logEngineActive") {
             logType = "success";
@@ -1035,14 +1153,20 @@ function App() {
         i18nParams: [e],
       });
 
-      // ✅ Sorun 2: Antivirüs uyarısı — spawn başarısızsa Defender engellemiş olabilir
+      // B5: Spawn hatasını kategorize et — kullanıcıya doğru aksiyon mesajı ver
       const errStr = String(e).toLowerCase();
-      if (errStr.includes("denied") || errStr.includes("access") || errStr.includes("not found") || errStr.includes("os error")) {
-        addLog(
-          "⚠️ " + t.logAntivirusWarning,
-          "warn",
-          { i18nKey: "logAntivirusWarning" }
-        );
+      let categoryKey = null;
+      if (errStr.includes("address already in use") || errStr.includes("only one usage") || errStr.includes("port")) {
+        categoryKey = "logSidecarPortBusy";
+      } else if (errStr.includes("not found") || errStr.includes("no such file") || errStr.includes("cannot find")) {
+        categoryKey = "logSidecarMissing";
+      } else if (errStr.includes("denied") || errStr.includes("access") || errStr.includes("permission") || errStr.includes("blocked")) {
+        categoryKey = "logSidecarBlocked";
+      } else if (errStr.includes("os error")) {
+        categoryKey = "logAntivirusWarning";
+      }
+      if (categoryKey) {
+        addLog("⚠️ " + (t[categoryKey] || ""), "warn", { i18nKey: categoryKey });
       }
       setIsConnected(false);
       setIsProcessing(false);
@@ -1233,7 +1357,7 @@ function App() {
       setIsProcessing(true);
       startEngine(0);
     }, 2500); // Portun serbest kalması için (SpoofDPI 1.2.1 / TIME_WAIT)
-  }, [config.dpiMethod, config.httpsChunkSize, config.lowCpuMode, config.selectedDns, config.dnsMode, config.enableWinhttp, config.ipv4Only, isConnected]);
+  }, [config.dpiMethod, config.httpsChunkSize, config.selectedDns, config.dnsMode, config.enableWinhttp, config.ipv4Only, isConnected]);
 
   useEffect(() => {
     // Initial cleanup on mount
@@ -1258,15 +1382,8 @@ function App() {
         await clearProxy(true);
         updateTrayTooltip("disconnected");
 
-        // İlk kurulumda sessizce Defender istisnası ekle (UAC reddedilirse / başarısızsa yutulur).
-        // Kullanıcıya popup gösterilmez. Başarılı olursa flag set edilir ve bir daha denenmez.
-        if (!localStorage.getItem(LS_KEYS.defenderExclusionAdded)) {
-          invoke("add_defender_exclusions")
-            .then(() => localStorage.setItem(LS_KEYS.defenderExclusionAdded, "1"))
-            .catch(() => {
-              // sessizce yut — kullanıcı yönetici değilse veya iptal ederse normaldir
-            });
-        }
+        // Defender consent (sessiz auto-add kaldırıldı) — onboarding bittikten sonra
+        // ayrı useEffect aracılığıyla soru dialog'u açılır.
 
         // P1-FIX: Auto-Connect Race Condition çözümü (Temizlik adımları tamamlandıktan SONRA bağlan)
         // ✅ İlk giriş overlay'ı açıksa auto-connect yapma — kullanıcı ISS seçsin önce
@@ -1324,6 +1441,7 @@ function App() {
         isExiting.current = true;
         userIntentDisconnect.current = true;
         setAppIsClosingState(true);
+        flushPendingConfig();
 
         // ✅ Timer'ı temizle
         if (retryTimer.current) {
@@ -1423,6 +1541,7 @@ function App() {
     isAppClosingRef.current = true;
     userIntentDisconnect.current = true; // Reconnect engelle
     setAppIsClosingState(true);
+    flushPendingConfig();
     addLog(t.logShutdownStarting, "warn", { i18nKey: "logShutdownStarting" });
 
     // ✅ Timer'ı temizle
@@ -1489,22 +1608,17 @@ function App() {
     return () => window.removeEventListener('dpireaper-force-disconnect', handleForceDisconnect);
   }, []);
 
-  // DPI & Layout Scaling Fix
+  // DPI & Layout Scaling Fix — B12: rAF debounce ile her resize event'inde DOM yazımı önlenir
   useEffect(() => {
-    const handleResize = () => {
-      // Hedef tasarım boyutları (Tauri config ile uyumlu)
+    let rafId = 0;
+    const applyScale = () => {
+      rafId = 0;
       const DESIGN_WIDTH = APP.designWidth;
       const DESIGN_HEIGHT = APP.designHeight;
-
       const currentWidth = window.innerWidth;
       const currentHeight = window.innerHeight;
-
-      // X ve Y eksenlerindeki sığma oranlarını hesapla
       const scaleX = currentWidth / DESIGN_WIDTH;
       const scaleY = currentHeight / DESIGN_HEIGHT;
-
-      // En kısıtlı alana göre scale belirle (Aspect Ratio koruyarak sığdır)
-      // %98'in altındaysa scale et (titremeyi önlemek için tolerans)
       const scale = Math.min(scaleX, scaleY);
 
       if (scale < 0.99) {
@@ -1519,16 +1633,34 @@ function App() {
         document.body.style.height = "";
       }
     };
+    const handleResize = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(applyScale);
+    };
 
     window.addEventListener("resize", handleResize);
+    applyScale();
+    const t1 = setTimeout(applyScale, 100);
+    const t2 = setTimeout(applyScale, 500);
 
-    // Initial checks
-    handleResize();
-    setTimeout(handleResize, 100);
-    setTimeout(handleResize, 500); // Yüklenme gecikmeleri için
-
-    return () => window.removeEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (rafId) cancelAnimationFrame(rafId);
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
   }, []);
+
+  // B6: Modal'larda ESC ile kapatma
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      if (showConnectionModal) { setShowConnectionModal(false); return; }
+      if (confirmState.isOpen) { handleConfirmResult(false); return; }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showConnectionModal, confirmState.isOpen]);
 
   // Native App Experience: Disable browser-like behaviors
   useEffect(() => {
@@ -1802,7 +1934,7 @@ function App() {
         )}
       </AnimatePresence>
 
-      {/* İlk Açılış — Bağlantı Profili Sihirbazı (Faz 3) */}
+      {/* İlk Açılış — 3-Adımlı Onboarding (C6) */}
       <AnimatePresence>
         {isAdmin && showFirstRunISS && !showSettings && (
           <motion.div
@@ -1832,42 +1964,124 @@ function App() {
                 className="app-logo app-logo--hero"
                 style={{ alignSelf: "center" }}
               />
-              <h1 style={{ fontSize: "1.2rem", marginBottom: "0.4rem", color: "var(--text-primary)", fontWeight: 700, letterSpacing: 0.5 }}>
-                {t.firstRunTitle}
-              </h1>
-              <p style={{ color: "var(--text-secondary)", marginBottom: "1.25rem", lineHeight: 1.45, fontSize: "0.85rem" }}>
-                {t.firstRunDesc}
-              </p>
 
-              <ConnectionProfilePicker
-                config={config}
-                updateConfig={updateConfig}
-                t={t}
-                compact={true}
-                ispDetection={ispDetection}
-              />
+              {/* Adım göstergesi — 4 adım (0=dil, 1=ne işe yarar, 2=profil, 3=LAN) */}
+              <div style={{ display: "flex", gap: 6, justifyContent: "center", margin: "0.5rem 0 1rem" }}>
+                {[0, 1, 2, 3].map((i) => (
+                  <span
+                    key={i}
+                    style={{
+                      width: i === onboardingStep ? 22 : 8,
+                      height: 4,
+                      borderRadius: 2,
+                      background: i === onboardingStep ? "var(--accent, #007fff)" : "rgba(255,255,255,0.15)",
+                      transition: "width var(--transition-base, 0.2s)",
+                    }}
+                  />
+                ))}
+              </div>
+
+              {onboardingStep === 0 && (
+                <>
+                  <h1 style={{ fontSize: "1.15rem", marginBottom: "0.4rem", color: "var(--text-primary)", fontWeight: 700, letterSpacing: 0.5 }}>
+                    {t.onboardingStep0Title}
+                  </h1>
+                  <p style={{ color: "var(--text-secondary)", marginBottom: "1rem", lineHeight: 1.45, fontSize: "0.8rem" }}>
+                    {t.onboardingStep0Desc}
+                  </p>
+                  <div style={{ maxHeight: 320, overflowY: "auto", paddingRight: 2 }}>
+                    <LanguagePicker
+                      value={config.language}
+                      onChange={(code) => updateConfig('language', code)}
+                      t={t}
+                      inline
+                    />
+                  </div>
+                </>
+              )}
+
+              {onboardingStep === 1 && (
+                <>
+                  <h1 style={{ fontSize: "1.15rem", marginBottom: "0.4rem", color: "var(--text-primary)", fontWeight: 700, letterSpacing: 0.5 }}>
+                    {t.onboardingStep1Title}
+                  </h1>
+                  <p style={{ color: "var(--text-secondary)", marginBottom: "1.25rem", lineHeight: 1.5, fontSize: "0.82rem" }}>
+                    {t.onboardingStep1Desc}
+                  </p>
+                </>
+              )}
+
+              {onboardingStep === 2 && (
+                <>
+                  <h1 style={{ fontSize: "1.15rem", marginBottom: "0.4rem", color: "var(--text-primary)", fontWeight: 700, letterSpacing: 0.5 }}>
+                    {t.onboardingStep2Title}
+                  </h1>
+                  <p style={{ color: "var(--text-secondary)", marginBottom: "1.0rem", lineHeight: 1.45, fontSize: "0.82rem" }}>
+                    {t.onboardingStep2Desc}
+                  </p>
+                  <ConnectionProfilePicker
+                    config={config}
+                    updateConfig={updateConfig}
+                    t={t}
+                    compact={true}
+                    ispDetection={ispDetection}
+                  />
+                </>
+              )}
+
+              {onboardingStep === 3 && (
+                <>
+                  <h1 style={{ fontSize: "1.15rem", marginBottom: "0.4rem", color: "var(--text-primary)", fontWeight: 700, letterSpacing: 0.5 }}>
+                    {t.onboardingStep3Title}
+                  </h1>
+                  <p style={{ color: "var(--text-secondary)", marginBottom: "1.0rem", lineHeight: 1.5, fontSize: "0.82rem" }}>
+                    {t.onboardingStep3Desc}
+                  </p>
+                </>
+              )}
+
+              <div style={{ display: "flex", gap: 8, marginTop: "1rem" }}>
+                {onboardingStep > 0 && (
+                  <button
+                    onClick={() => setOnboardingStep(onboardingStep - 1)}
+                    className="cta-btn cta-btn--secondary"
+                  >
+                    {t.onboardingBack}
+                  </button>
+                )}
+                {onboardingStep < 3 && (
+                  <button
+                    onClick={() => setOnboardingStep(onboardingStep + 1)}
+                    className="cta-btn cta-btn--primary"
+                  >
+                    {t.onboardingNext}
+                  </button>
+                )}
+                {onboardingStep === 3 && (
+                  <button
+                    onClick={() => {
+                      localStorage.setItem(LS_KEYS.firstRun, 'true');
+                      localStorage.setItem(LS_KEYS.onboardingDone, 'true');
+                      setShowFirstRunISS(false);
+                      if (!isConnected && !isProcessing) {
+                        retryCount.current = 0;
+                        userIntentDisconnect.current = false;
+                        setIsProcessing(true);
+                        startEngine(8080);
+                      }
+                    }}
+                    className="cta-btn cta-btn--primary"
+                  >
+                    <Power size={16} strokeWidth={2.4} />
+                    {t.firstRunApply}
+                  </button>
+                )}
+              </div>
 
               <button
                 onClick={() => {
                   localStorage.setItem(LS_KEYS.firstRun, 'true');
-                  setShowFirstRunISS(false);
-                  if (!isConnected && !isProcessing) {
-                    retryCount.current = 0;
-                    userIntentDisconnect.current = false;
-                    setIsProcessing(true);
-                    startEngine(8080);
-                  }
-                }}
-                className="main-btn connect"
-                style={{ marginTop: "1.25rem" }}
-              >
-                <Power size={18} strokeWidth={2.4} />
-                {t.firstRunApply}
-              </button>
-
-              <button
-                onClick={() => {
-                  localStorage.setItem(LS_KEYS.firstRun, 'true');
+                  localStorage.setItem(LS_KEYS.onboardingDone, 'true');
                   setShowFirstRunISS(false);
                 }}
                 style={{
@@ -1959,19 +2173,34 @@ function App() {
                 exit={{ opacity: 0, y: 6 }}
                 transition={{ duration: 0.2 }}
               >
-                <div className="status-summary">
-                  <span className="status-summary-item">
-                    <span className="status-summary-label">{t.summaryProfile || 'Profil'}</span>
-                    <span className="status-summary-value">{tierLabel}</span>
-                  </span>
-                  {dnsLabel && (
-                    <>
-                      <span className="status-summary-divider" />
-                      <span className="status-summary-item">
-                        <span className="status-summary-label">{t.summaryDns || 'DNS'}</span>
-                        <span className="status-summary-value">{dnsLabel}</span>
+                <div className="status-summary-row">
+                  <div className="status-summary">
+                    <span className="status-summary-item">
+                      <span className="status-summary-label">{t.summaryProfile || 'Profil'}</span>
+                      <span className="status-summary-value">{tierLabel}</span>
+                    </span>
+                    {dnsLabel && (
+                      <>
+                        <span className="status-summary-divider" />
+                        <span className="status-summary-item">
+                          <span className="status-summary-label">{t.summaryDns || 'DNS'}</span>
+                          <span className="status-summary-value">{dnsLabel}</span>
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {/* Health indicator — aynı satırda, sağda */}
+                  {healthStatus && (
+                    <div className={`health-indicator ${healthStatus.ok ? 'is-ok' : 'is-fail'}`}>
+                      <span className="health-indicator-dot" />
+                      <span className="health-indicator-text">
+                        {healthStatus.ok
+                          ? (healthStatus.latencyMs > 0
+                              ? `${t.healthLabelOk} · ${healthStatus.latencyMs}ms`
+                              : t.healthLabelOk)
+                          : t.healthLabelFail}
                       </span>
-                    </>
+                    </div>
                   )}
                 </div>
                 <BypassGraph stats={bypassStats} t={t} visible />
@@ -1981,29 +2210,39 @@ function App() {
         </AnimatePresence>
       </main>
 
-      {/* Action Button */}
-      <div className="action-area">
-        {/* LAN Connect Button */}
+      {/* Sağ üst: bağlan (LAN) + bağış */}
+      <div className="main-corner-bar">
         <AnimatePresence>
           {config.lanSharing && isConnected && (
             <motion.button
-              initial={{ opacity: 0, y: 10, height: 0 }}
-              animate={{
-                opacity: 1,
-                y: 0,
-                height: "auto",
-                marginBottom: "1rem",
-              }}
-              exit={{ opacity: 0, y: 10, height: 0, marginBottom: 0 }}
-              className="lan-connect-pill-btn"
+              key="lan-connect"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.18 }}
+              className="icon-btn lan-connect-corner-btn"
               onClick={() => setShowConnectionModal(true)}
+              aria-label={t.btnConnectDevices}
+              title={t.btnConnectDevices}
             >
               <Smartphone size={16} />
-              <span>{t.btnConnectDevices}</span>
-              <div className="arrow-icon">›</div>
             </motion.button>
           )}
         </AnimatePresence>
+        <button
+          type="button"
+          className="donate-corner-btn"
+          onClick={() => openShell(URLS.patreon).catch(() => {})}
+          aria-label={t.donateLabel}
+          title={t.donateLabel}
+        >
+          <Heart size={14} strokeWidth={2.4} />
+          <span>{t.donateLabel}</span>
+        </button>
+      </div>
+
+      {/* Action Button */}
+      <div className="action-area">
 
         {(() => {
           const btnLabel = isApplyingSettings
@@ -2029,31 +2268,61 @@ function App() {
         })()}
       </div>
 
-      {/* Bottom Navigation — Çıkış tray ve onay diyaloğuna taşındı (Faz 1) */}
-      <nav className="bottom-nav">
-        <button className="nav-btn" onClick={() => setShowSettings(true)}>
-          <SettingsIcon size={20} strokeWidth={2} />
-          <span>{t.navSettings}</span>
+      {/* Bottom Navigation — icon-only */}
+      <nav className="bottom-nav" aria-label={t.navSettings + " / " + t.navLogs}>
+        <button
+          className="nav-btn nav-btn--icon"
+          onClick={() => setShowSettings(true)}
+          aria-label={t.navSettings}
+          title={t.navSettings}
+        >
+          <SlidersHorizontal size={20} strokeWidth={2} />
         </button>
         <div className="nav-divider" />
-        <button className="nav-btn" onClick={() => setShowLogs(true)}>
-          <FileText size={20} strokeWidth={2} />
-          <span>{t.navLogs}</span>
+        <button
+          className="nav-btn nav-btn--icon"
+          onClick={() => setShowLogs(true)}
+          aria-label={t.navLogs}
+          title={t.navLogs}
+        >
+          <ScrollText size={20} strokeWidth={2} />
         </button>
       </nav>
 
       {showLogs && (
         <div className="logs-overlay">
           <div className="logs-header">
-            <button
-              className="logs-back-btn"
-              onClick={() => setShowLogs(false)}
-            >
-              <X size={24} />
-            </button>
-            <div className="logs-title">
-              <FileText size={20} className="logs-title-icon" />
-              <h3>{t.logsTitle}</h3>
+            <h3 className="logs-title-text">{t.logsTitle}</h3>
+            <div className="logs-header-actions">
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={clearLogs}
+                disabled={logs.length === 0}
+                aria-label={t.logsClear}
+                title={t.logsClear}
+              >
+                <Trash2 size={16} />
+              </button>
+              <button
+                type="button"
+                className={`icon-btn ${copyStatus === 'success' ? 'is-success' : ''} ${copyStatus === 'error' ? 'is-error' : ''}`}
+                onClick={copyLogs}
+                disabled={logs.length === 0}
+                aria-label={t.logsCopy}
+                title={t.logsCopy}
+              >
+                {copyStatus === 'success' ? <Check size={16} /> : <Copy size={16} />}
+              </button>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setShowLogs(false)}
+                aria-label="Kapat"
+                title="Kapat"
+              >
+                <X size={16} />
+              </button>
             </div>
           </div>
 
@@ -2107,7 +2376,7 @@ function App() {
                           {String(index + 1).padStart(3, "0")}
                         </span>
                         <span className="log-time">[{log.time}]</span>
-                        <span className="log-msg">{log.msg}</span>
+                        <span className="log-msg">{getLogText(log)}</span>
                       </div>
                     ))
                   )}
@@ -2117,409 +2386,43 @@ function App() {
             );
           })()}
 
-          <div className="logs-footer">
-            <button className="logs-action-btn clear-btn" onClick={clearLogs}>
-              <Trash2 size={18} />
-              <span>{t.logsClear}</span>
-            </button>
-            <button
-              className={`logs-action-btn copy-btn ${copyStatus}`}
-              onClick={copyLogs}
-              disabled={logs.length === 0}
-            >
-              <Copy size={18} />
-              <span>
-                {copyStatus === "success"
-                  ? t.logsCopied
-                  : copyStatus === "error"
-                    ? t.logsCopyError
-                    : t.logsCopy}
-              </span>
-            </button>
-          </div>
         </div>
       )}
 
-      {/* Connection Info Modal */}
+      {/* Cihaz Bağla — sade QR modal */}
       <AnimatePresence>
         {showConnectionModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="modal-overlay"
-            style={{
-              zIndex: 10000,
-              background: "rgba(9, 9, 11, 0.65)",
-              backdropFilter: "blur(6px)",
-            }}
+            className="connect-modal-overlay"
             onClick={() => setShowConnectionModal(false)}
           >
-            <div
-              style={{
-                position: "absolute",
-                top: "40%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                width: "100%",
-                height: "400px",
-                background:
-                  "radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, rgba(0,0,0,0) 50%)",
-                pointerEvents: "none",
-                zIndex: 0,
-              }}
-            />
-
             <motion.div
-              initial={{ scale: 0.95, y: 15, opacity: 0 }}
-              animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0.95, y: 15, opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="connection-modal"
-              style={{
-                zIndex: 1,
-                maxWidth: "450px",
-                width: "125%",
-                background: "#18181b",
-                border: "1px solid rgba(255, 255, 255, 0.12)",
-                boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
-                padding: "24px",
-              }}
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+              className="connect-modal-box"
               onClick={(e) => e.stopPropagation()}
             >
-              <div
-                className="modal-header"
-                style={{
-                  marginBottom: "1.5rem",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "1rem",
-                  position: "relative",
-                }}
-              >
-                <div
-                  style={{
-                    width: "48px",
-                    height: "48px",
-                    borderRadius: "14px",
-                    background: "rgba(59, 130, 246, 0.1)",
-                    border: "1px solid rgba(59, 130, 246, 0.2)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Smartphone size={24} color="#3b82f6" />
-                </div>
-                <div>
-                  <h2
-                    style={{
-                      fontSize: "1.15rem",
-                      fontWeight: "700",
-                      color: "#f8fafc",
-                      margin: 0,
-                      marginBottom: "2px",
-                    }}
-                  >
-                    {t.modalTitle}
-                  </h2>
-                  <p
-                    style={{ fontSize: "0.8rem", color: "#94a3b8", margin: 0 }}
-                  >
-                    {t.modalSubtitle}
-                  </p>
-                </div>
+              <div className="connect-modal-header">
                 <button
-                  className="close-btn"
+                  type="button"
+                  className="icon-btn"
                   onClick={() => setShowConnectionModal(false)}
-                  style={{
-                    position: "absolute",
-                    right: "-5px",
-                    top: "-5px",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    color: "#a1a1aa",
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "50%",
-                    padding: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background =
-                      "rgba(255, 255, 255, 0.1)";
-                    e.currentTarget.style.color = "#fff";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background =
-                      "rgba(255, 255, 255, 0.05)";
-                    e.currentTarget.style.color = "#a1a1aa";
-                  }}
+                  aria-label="Kapat"
+                  title="Kapat"
                 >
-                  <X size={18} />
+                  <X size={16} />
                 </button>
+                <h2 className="connect-modal-title">{t.btnConnectDevices}</h2>
               </div>
-
-              <div className="modal-body">
-                {/* Sekmeler */}
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "4px",
-                    marginBottom: "1.25rem",
-                    background: "rgba(255,255,255,0.06)",
-                    padding: "4px",
-                    borderRadius: "10px",
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setConnectionModalTab("pac")}
-                    style={{
-                      flex: 1,
-                      padding: "0.5rem 0.75rem",
-                      borderRadius: "8px",
-                      border: "none",
-                      background:
-                        connectionModalTab === "pac"
-                          ? "rgba(34, 197, 94, 0.25)"
-                          : "transparent",
-                      color:
-                        connectionModalTab === "pac" ? "#4ade80" : "#94a3b8",
-                      fontWeight: connectionModalTab === "pac" ? 600 : 500,
-                      fontSize: "0.8rem",
-                      cursor: "pointer",
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    {t.modalTabPac}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConnectionModalTab("manual")}
-                    style={{
-                      flex: 1,
-                      padding: "0.5rem 0.75rem",
-                      borderRadius: "8px",
-                      border: "none",
-                      background:
-                        connectionModalTab === "manual"
-                          ? "rgba(59, 130, 246, 0.2)"
-                          : "transparent",
-                      color:
-                        connectionModalTab === "manual" ? "#60a5fa" : "#94a3b8",
-                      fontWeight: connectionModalTab === "manual" ? 600 : 500,
-                      fontSize: "0.8rem",
-                      cursor: "pointer",
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    {t.modalTabManual}
-                  </button>
-                </div>
-
-                {connectionModalTab === "pac" && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginBottom: '0.5rem' }}>
-                    {/* Note */}
-                    <div style={{
-                        background: 'rgba(239, 68, 68, 0.08)',
-                        border: '1px solid rgba(239, 68, 68, 0.2)',
-                        borderRadius: '12px',
-                        padding: '10px 12px',
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: '10px',
-                        textAlign: 'left'
-                    }}>
-                        <AlertTriangle size={18} color="#f87171" style={{ flexShrink: 0, marginTop: '1px' }} />
-                        <div style={{ fontSize: '0.75rem', color: '#fca5a5', lineHeight: 1.4 }}>
-                           <strong style={{ color: '#ef4444' }}>{t.modalPacWarningTitle}</strong> {t.modalPacWarningDesc}
-                        </div>
-                    </div>
-                    {/* Step 1: Install Guide */}
-                    <div style={{
-                        background: 'rgba(59, 130, 246, 0.08)',
-                        border: '1px solid rgba(59, 130, 246, 0.2)',
-                        borderRadius: '12px',
-                        padding: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px'
-                    }}>
-                       <div
-                         onClick={() => setShowLargeQr(true)}
-                         title="Büyütmek için tıklayın"
-                         style={{ background: '#fff', padding: '4px', borderRadius: '8px', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', position: 'relative', transition: 'transform 0.2s', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                         onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-                         onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                       >
-                         <QRCodeSVG value={`http://${lanIp}:${pacPort}/`} size={64} level="M" />
-                         <div style={{ display: 'flex', alignItems: 'center', gap: '2px', background: 'rgba(59, 130, 246, 0.1)', color: '#2563eb', fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', marginTop: '4px' }}>
-                           <ZoomIn size={10} strokeWidth={3} />
-                           BÜYÜT
-                         </div>
-                       </div>
-                       <div>
-                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#60a5fa', marginBottom: '2px' }}>{t.modalPacStep1Title}</div>
-                         <div style={{ fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.4 }}>{t.modalPacStep1Desc}</div>
-                       </div>
-                    </div>
-
-                    {/* Step 2: PAC URL */}
-                    <div style={{
-                        background: 'rgba(34, 197, 94, 0.08)',
-                        border: '1px solid rgba(34, 197, 94, 0.2)',
-                        borderRadius: '12px',
-                        padding: '12px',
-                    }}>
-                       <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#4ade80', marginBottom: '4px' }}>{t.modalPacStep2Title}</div>
-                       <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '8px', lineHeight: 1.4 }}>{t.modalPacStep2Desc}</div>
-                       
-                       <div
-                          className="code-box"
-                          onClick={() => handleCopyField(`http://${lanIp}:${pacPort}/proxy.pac`, 'pac')}
-                          title="Kopyala"
-                          style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(34, 197, 94, 0.15)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'all 0.2s', margin: 0 }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0,0,0,0.5)'; e.currentTarget.style.borderColor = 'rgba(34, 197, 94, 0.3)'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(0,0,0,0.3)'; e.currentTarget.style.borderColor = 'rgba(34, 197, 94, 0.15)'; }}
-                        >
-                          <span style={{ fontSize: '0.8rem', whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: '#f8fafc', fontWeight: 500, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' }}>
-                            http://{lanIp}:{pacPort}/proxy.pac
-                          </span>
-                          {copiedField === 'pac' ? <Check size={16} color="#4ade80" style={{ flexShrink: 0, marginLeft: '8px' }} /> : <Copy size={16} color="#4ade80" style={{ flexShrink: 0, marginLeft: '8px' }} />}
-                        </div>
-                    </div>
-                  </div>
-                )}
-
-                {connectionModalTab === "manual" && (
-                  <>
-                    {/* Note */}
-                    <div style={{
-                        background: 'rgba(239, 68, 68, 0.08)',
-                        border: '1px solid rgba(239, 68, 68, 0.2)',
-                        borderRadius: '12px',
-                        padding: '10px 12px',
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: '10px',
-                        marginBottom: '1rem',
-                        textAlign: 'left'
-                    }}>
-                        <AlertTriangle size={18} color="#f87171" style={{ flexShrink: 0, marginTop: '1px' }} />
-                        <div style={{ fontSize: '0.75rem', color: '#fca5a5', lineHeight: 1.4 }}>
-                           <strong style={{ color: '#ef4444' }}>{t.modalManualWarningTitle}</strong> {t.modalManualWarningDesc}
-                        </div>
-                    </div>
-                    <p
-                      style={{
-                        fontSize: "0.85rem",
-                        color: "#94a3b8",
-                        lineHeight: "1.5",
-                        marginBottom: "1rem",
-                      }}
-                    >
-                      <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(t.modalDesc, PURIFY_CONFIG) }} />
-                    </p>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "1rem",
-                        marginBottom: "1.5rem",
-                      }}
-                    >
-                      <div>
-                        <label
-                          style={{
-                            display: "block",
-                            fontSize: "0.75rem",
-                            color: "#71717a",
-                            marginBottom: "0.5rem",
-                            textTransform: "uppercase",
-                            fontWeight: "600",
-                            letterSpacing: "0.05em",
-                          }}
-                        >
-                          {t.modalHost}
-                        </label>
-                        <div
-                          className="code-box"
-                          onClick={() => handleCopyField(lanIp, 'host')}
-                          title="Kopyala"
-                          style={{ transition: 'all 0.2s', background: copiedField === 'host' ? 'rgba(34, 197, 94, 0.1)' : undefined, borderColor: copiedField === 'host' ? 'rgba(34, 197, 94, 0.3)' : undefined }}
-                        >
-                          <span style={{ color: copiedField === 'host' ? '#4ade80' : undefined }}>{lanIp}</span>
-                          {copiedField === 'host' ? <Check size={16} color="#4ade80" /> : <Copy size={16} color="#71717a" />}
-                        </div>
-                      </div>
-                      <div>
-                        <label
-                          style={{
-                            display: "block",
-                            fontSize: "0.75rem",
-                            color: "#71717a",
-                            marginBottom: "0.5rem",
-                            textTransform: "uppercase",
-                            fontWeight: "600",
-                            letterSpacing: "0.05em",
-                          }}
-                        >
-                          {t.modalPort}
-                        </label>
-                        <div
-                          className="code-box"
-                          onClick={() => handleCopyField(currentPort.toString(), 'port')}
-                          title="Kopyala"
-                          style={{ transition: 'all 0.2s', background: copiedField === 'port' ? 'rgba(34, 197, 94, 0.1)' : undefined, borderColor: copiedField === 'port' ? 'rgba(34, 197, 94, 0.3)' : undefined }}
-                        >
-                          <span style={{ color: copiedField === 'port' ? '#4ade80' : undefined }}>{currentPort}</span>
-                          {copiedField === 'port' ? <Check size={16} color="#4ade80" /> : <Copy size={16} color="#71717a" />}
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-
+              <div className="connect-modal-qr">
+                <QRCodeSVG value={`http://${lanIp}:${pacPort}/?lang=${config.language || 'en'}`} size={280} level="M" />
               </div>
-
-              {/* Büyütülmüş QR Kod Overlay */}
-              <AnimatePresence>
-                {showLargeQr && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      background: "rgba(24, 24, 27, 0.95)",
-                      backdropFilter: "blur(8px)",
-                      zIndex: 10,
-                      borderRadius: "16px",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "24px",
-                      cursor: "pointer"
-                    }}
-                    onClick={() => setShowLargeQr(false)}
-                  >
-                    <div style={{ background: 'white', padding: '16px', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
-                      <QRCodeSVG value={`http://${lanIp}:${pacPort}/`} size={240} level="M" />
-                    </div>
-                    <div style={{ marginTop: '24px', color: '#a1a1aa', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.05)', padding: '8px 16px', borderRadius: '20px' }}>
-                      <X size={16} />
-                      Kapatmak için dokunun
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <p className="connect-modal-caption">{t.modalScanWithPhone}</p>
             </motion.div>
           </motion.div>
         )}
@@ -2646,6 +2549,7 @@ function App() {
                     {t.btnNo || "İptal"}
                   </button>
                   <button
+                    autoFocus
                     onClick={() => handleConfirmResult(true)}
                     style={{
                       fontFamily: "inherit",
@@ -2691,8 +2595,19 @@ function App() {
           dnsLatencies={dnsLatencies}
           setDnsLatencies={setDnsLatencies}
           ispDetection={ispDetection}
+          isConnected={isConnected}
+          currentPort={currentPort}
+          defenderDecision={defenderDecision}
+          requestDefenderExclusion={requestDefenderExclusion}
         />
       )}
+
+      <DefenderConsentModal
+        open={showDefenderConsent}
+        t={t}
+        onAccept={handleDefenderConsentAccept}
+        onDecline={handleDefenderConsentDecline}
+      />
     </div>
   );
 }

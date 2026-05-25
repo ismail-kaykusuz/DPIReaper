@@ -134,12 +134,17 @@ fn collect_windows_hints() -> String {
     String::new()
 }
 
+/// B3: blocking I/O'yu Tauri async runtime'ının blocking pool'una taşı.
+/// `ipconfig` + `netsh` çağrıları 200-700ms sürebilir; ana thread'i kilitlememeli.
 #[tauri::command]
-pub fn detect_isp() -> IspDetectionResult {
-    let hints = collect_windows_hints();
-    if hints.is_empty() {
-        return default_result();
-    }
-
-    match_from_text(&hints).unwrap_or_else(default_result)
+pub async fn detect_isp() -> IspDetectionResult {
+    tauri::async_runtime::spawn_blocking(|| {
+        let hints = collect_windows_hints();
+        if hints.is_empty() {
+            return default_result();
+        }
+        match_from_text(&hints).unwrap_or_else(default_result)
+    })
+    .await
+    .unwrap_or_else(|_| default_result())
 }
