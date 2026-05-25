@@ -1,8 +1,8 @@
-//! Windows autostart: Run registry + StartupApproved (0x02 = enabled) + logon scheduled task.
+//! Windows autostart: Task Scheduler (primary) + Run registry (Settings UI) + StartupApproved.
 
 #[cfg(windows)]
 mod imp {
-    use std::fs;
+    use std::fs::{self, File};
     use std::io::Write;
     use std::os::windows::process::CommandExt;
     use std::path::{Path, PathBuf};
@@ -14,10 +14,13 @@ mod imp {
     const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
     const STARTUP_APPROVED_KEY: &str =
         r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
+    const APP_COMPAT_LAYERS: &str =
+        r"Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers";
     const VALUE_NAME: &str = "DPIReaper";
     const TASK_NAME: &str = "DPIReaperAutostart";
     // Windows StartupApproved: byte0 LSB=0 enabled (0x02), LSB=1 disabled (0x03 + timestamp).
     const STARTUP_ENABLED: [u8; 12] = [0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    const LOGON_DELAY: &str = "PT45S";
 
     fn pref_path() -> Result<PathBuf, String> {
         let base = std::env::var_os("LOCALAPPDATA").ok_or("LOCALAPPDATA bulunamadi")?;
@@ -129,6 +132,37 @@ mod imp {
         }
     }
 
+    /// "Run as administrator" uyumluluk bayragi startup'ta UAC istemeden calismayi engeller (0x800702E4).
+    fn clear_run_as_admin_shims(_exe: &Path) {
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let Ok(key) = hkcu.open_subkey(APP_COMPAT_LAYERS) else {
+            return;
+        };
+
+        let mut removed = Vec::new();
+
+        for entry in key.enum_values().filter_map(|e| e.ok()) {
+            let name = entry.0;
+            if !normalize_path(&name).contains("dpireaper.exe") {
+                continue;
+            }
+            let val: String = match key.get_value(&name) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            if val.to_uppercase().contains("RUNASADMIN") && key.delete_value(&name).is_ok() {
+                removed.push(name);
+            }
+        }
+
+        if !removed.is_empty() {
+            eprintln!(
+                "[AUTOSTART] RUNASADMIN uyumluluk bayragi kaldirildi (startup engeli): {:?}",
+                removed
+            );
+        }
+    }
+
     fn task_exists() -> bool {
         Command::new("schtasks")
             .args(["/Query", "/TN", TASK_NAME])
@@ -140,26 +174,81 @@ mod imp {
             .unwrap_or(false)
     }
 
+    fn xml_escape(s: &str) -> String {
+        s.replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+            .replace('"', "&quot;")
+    }
+
+    fn write_utf16_xml(path: &Path, content: &str) -> Result<(), String> {
+        let mut file = File::create(path).map_err(|e| e.to_string())?;
+        file.write_all(&[0xFF, 0xFE]).map_err(|e| e.to_string())?;
+        for unit in content.encode_utf16() {
+            file.write_all(&unit.to_le_bytes())
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+
     fn create_scheduled_task(exe: &Path) -> Result<(), String> {
-        let tr = run_command_for_exe(exe);
+        delete_scheduled_task();
+
+        let exe_str = xml_escape(&exe.display().to_string());
+        let work_dir = exe
+            .parent()
+            .map(|p| xml_escape(&p.display().to_string()))
+            .unwrap_or_else(|| xml_escape(&exe.display().to_string()));
+
+        let xml = format!(
+            r#"<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>DPIReaper autostart at user logon</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <LogonTrigger>
+      <Delay>{LOGON_DELAY}</Delay>
+      <Enabled>true</Enabled>
+    </LogonTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>LeastPrivilege</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>{exe_str}</Command>
+      <Arguments>--autostart</Arguments>
+      <WorkingDirectory>{work_dir}</WorkingDirectory>
+    </Exec>
+  </Actions>
+</Task>"#
+        );
+
+        let xml_path = std::env::temp_dir().join("dpireaper_autostart_task.xml");
+        write_utf16_xml(&xml_path, &xml)?;
+
         let output = Command::new("schtasks")
-            .args([
-                "/Create",
-                "/TN",
-                TASK_NAME,
-                "/TR",
-                &tr,
-                "/SC",
-                "ONLOGON",
-                "/RL",
-                "LIMITED",
-                "/DELAY",
-                "0000:30",
-                "/F",
-            ])
+            .args(["/Create", "/TN", TASK_NAME, "/XML", &xml_path.to_string_lossy(), "/F"])
             .creation_flags(CREATE_NO_WINDOW)
             .output()
             .map_err(|e| format!("schtasks create: {}", e))?;
+
+        let _ = fs::remove_file(&xml_path);
 
         if output.status.success() {
             return Ok(());
@@ -199,7 +288,7 @@ mod imp {
 
         if enabled {
             let exe = exe_path()?;
-            // StartupApproved once — Run eklenince Explorer varsayilan olarak disabled (0x03) yazabiliyor.
+            clear_run_as_admin_shims(&exe);
             write_startup_approved()?;
             write_run_registry(&exe)?;
             write_startup_approved()?;
@@ -214,6 +303,12 @@ mod imp {
     }
 
     pub fn heal_on_startup() {
+        let exe = match exe_path() {
+            Ok(p) => p,
+            Err(_) => return,
+        };
+        clear_run_as_admin_shims(&exe);
+
         let want = match read_pref() {
             Some(v) => v,
             None => run_registry_active().unwrap_or(false) || task_exists(),

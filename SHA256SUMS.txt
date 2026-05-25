@@ -1,2 +1,2 @@
-2a2ff8148bff7b262a938d50f2fbb2987f77afc4f2cf43e7856a3ef23fb5a7c1  DPIReaper_1.0.4_x64-setup.exe
-ad5c57aecb76403a3ffa126da036b4911111e0e78ecf41f31ee7258959bc440b  DPIReaper_1.0.4_x64_en-US.msi
+731415f7b7743abde4af70b214f1ee7858b2de68872965be722c853c813ec55b  DPIReaper_1.0.5_x64-setup.exe
+595e0d189fca3a8fbba2891bd3aa5ac67f32495b2c5daa0fe2769c257fdece01  DPIReaper_1.0.5_x64_en-US.msi
