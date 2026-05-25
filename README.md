@@ -149,6 +149,11 @@ Hardening:
 
 Pairing a phone is then a one-tap flow: scan the QR shown in the *Connect Other Devices* panel → the setup page opens in the device's own language → tap the copy icon next to the PAC URL → paste it into Wi-Fi proxy settings.
 
+<p align="center">
+  <img src="images/setup_other_devices.png" alt="Localized setup page served on the LAN — PAC and Manual tabs with one-tap copy" width="760">
+  <br><sub><i>The page that opens on the phone after scanning the QR — automatically rendered in the app's current language, with PAC and Manual tabs.</i></sub>
+</p>
+
 ---
 
 ## Architecture &amp; Security

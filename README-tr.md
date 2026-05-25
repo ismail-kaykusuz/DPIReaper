@@ -149,6 +149,11 @@ Sertleştirme:
 
 Telefon eşlemek tek dokunuş: *Diğer Cihazları Bağla* panelinden QR'ı tarat → kurulum sayfası cihazın dilinde açılır → PAC adresinin yanındaki kopyala ikonuna dokun → Wi-Fi proxy ayarlarına yapıştır.
 
+<p align="center">
+  <img src="images/setup_other_devices.png" alt="LAN'da sunulan yerelleştirilmiş kurulum sayfası — PAC ve Manuel sekmeleri, tek dokunuşla kopyalama" width="760">
+  <br><sub><i>QR'ı okuttuktan sonra telefonda açılan sayfa — uygulamanın o anki diliyle, PAC ve Manuel sekmeleriyle.</i></sub>
+</p>
+
 ---
 
 ## Mimari ve Güvenlik
