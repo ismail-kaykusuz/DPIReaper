@@ -1,4 +1,4 @@
-/* Inter Font — Lokal Bundle (dış bağımlılık yok, offline çalışır) */
+/* Inter Font — local bundle (no external deps, works offline) */
 @font-face {
   font-family: "Inter";
   font-style: normal;
@@ -43,13 +43,13 @@
 }
 
 :root {
-  /* ─── Tipografi ölçeği (Madde 6) ────────────────────────── */
-  --font-display: 1.5rem;       /* 24px - büyük sayfa başlığı (nadir) */
-  --font-h1: 1.125rem;          /* 18px - ana başlık */
-  --font-h2: 0.95rem;           /* 15px - section başlık */
-  --font-h3: 0.84rem;           /* 13.5px - kart/item başlık */
+  /* ─── Typography scale (item 6) ────────────────────────── */
+  --font-display: 1.5rem;       /* 24px - large page title (rare) */
+  --font-h1: 1.125rem;          /* 18px - main heading */
+  --font-h2: 0.95rem;           /* 15px - section heading */
+  --font-h3: 0.84rem;           /* 13.5px - card/item heading */
   --font-body: 0.82rem;         /* 13px - body text */
-  --font-caption: 0.72rem;      /* 11.5px - alt açıklama, badge */
+  --font-caption: 0.72rem;      /* 11.5px - caption, badge */
   --font-micro: 0.66rem;        /* 10.5px - section header uppercase, hint */
 
   --weight-bold: 700;
@@ -71,39 +71,39 @@
   --text-secondary: #a1a1aa;
   --text-tertiary: #71717a;
 
-  /* Brand accent — navigasyon, seçili kart, birincil CTA */
+  /* Brand accent — navigation, selected card, primary CTA */
   --accent: #007fff;
   --accent-hover: #0066cc;
   --accent-soft: rgba(0, 127, 255, 0.12);
   --accent-softer: rgba(0, 127, 255, 0.06);
   --accent-glow: rgba(0, 127, 255, 0.28);
 
-  /* Success — bağlı / güvenli durum */
+  /* Success — connected / secure state */
   --success: #00e676;
   --success-hover: #00c853;
   --success-soft: rgba(0, 230, 118, 0.12);
   --success-softer: rgba(0, 230, 118, 0.06);
   --success-glow: rgba(0, 230, 118, 0.32);
 
-  /* Danger — hata, bağlantı kes, kritik uyarı */
+  /* Danger — error, disconnect, critical warning */
   --danger: #ef4444;
   --danger-hover: #dc2626;
   --danger-soft: rgba(239, 68, 68, 0.12);
   --danger-softer: rgba(239, 68, 68, 0.06);
   --danger-glow: rgba(239, 68, 68, 0.28);
 
-  /* Warning — bilgi banner'ları */
+  /* Warning — info banners */
   --warning: #f59e0b;
   --warning-soft: rgba(245, 158, 11, 0.12);
   --warning-border: rgba(245, 158, 11, 0.35);
 
-  /* Legacy semantic — log seviyeleri */
+  /* Legacy semantic — log levels */
   --accent-blue: #007fff;
   --accent-green: #00e676;
   --accent-yellow: #f59e0b;
   --accent-red: #ef4444;
 
-  /* Neutral surface stack — kurumsal kart/satır arka planları */
+  /* Neutral surface stack — corporate card/row backgrounds */
   --surface-1: rgba(255, 255, 255, 0.03);
   --surface-2: rgba(255, 255, 255, 0.05);
   --surface-3: rgba(255, 255, 255, 0.08);
@@ -234,6 +234,35 @@ body {
   );
 }
 
+/* Skip painting main screen when settings/logs open — WebView2 CPU savings */
+.app-container.overlay-open .main-content,
+.app-container.overlay-open .action-area,
+.app-container.overlay-open .main-corner-bar,
+.app-container.overlay-open > .bottom-nav {
+  visibility: hidden;
+  pointer-events: none;
+  contain: strict;
+  content-visibility: hidden;
+}
+
+.app-container.overlay-open .shield-wave,
+.app-container.overlay-open .main-btn,
+.app-container.overlay-open .bypass-graph {
+  animation: none !important;
+}
+
+.app-container.overlay-open {
+  background: var(--bg-base);
+}
+
+.app-container.overlay-open::before {
+  display: none;
+}
+
+.app-container.overlay-open.fade-in {
+  animation: none;
+}
+
 .fade-in {
   animation: fadeIn 0.3s ease-out;
 }
@@ -250,7 +279,7 @@ body {
 }
 
 /* ==========================================
-   WINDOW DRAG REGION — ince üst boşluk
+   WINDOW DRAG REGION — thin top padding
    ========================================== */
 .window-drag {
   flex: 0 0 auto;
@@ -259,7 +288,7 @@ body {
   -webkit-app-region: drag;
 }
 
-/* Eski header sınıfları geriye dönük uyum için bırakıldı */
+/* Legacy header classes kept for backward compatibility */
 .app-header {
   display: none;
 }
@@ -426,10 +455,9 @@ body {
 .shield-circle .shield-icon {
   opacity: 0.6;
   color: var(--text-secondary);
-  will-change: color, opacity;
 }
 
-/* Connected State — güvenli yeşil vurgu */
+/* Connected State — secure green accent */
 .shield-circle.connected {
   border-color: var(--success-glow);
   background: var(--success-soft);
@@ -446,11 +474,11 @@ body {
   color: var(--success);
 }
 
-/* Processing State - nötr breathe */
+/* Processing State - neutral breathe (static transition) */
 .shield-circle.processing {
   border-color: var(--border-strong);
   background: var(--surface-2);
-  animation: breathe 1.6s infinite ease-in-out;
+  transition: opacity 0.3s ease, border-color 0.3s ease;
 }
 
 .shield-circle.processing .shield-icon {
@@ -527,7 +555,7 @@ body {
   line-height: 1.4;
 }
 
-/* Stats yığını — chip + grafik tek bir görsel blok */
+/* Stats stack — chip + graph as one visual block */
 .stats-stack {
   display: flex;
   flex-direction: column;
@@ -536,7 +564,7 @@ body {
   gap: 8px;
 }
 
-/* Status summary — bağlıyken Profil · DNS şeridi */
+/* Status summary — Profile · DNS strip when connected */
 .status-summary {
   display: inline-flex;
   align-items: center;
@@ -605,7 +633,7 @@ body {
   will-change: transform;
 }
 
-/* Connect — marka mavisi CTA */
+/* Connect — brand blue CTA */
 .main-btn.connect {
   color: #ffffff;
   background: var(--accent);
@@ -622,7 +650,7 @@ body {
   transform: translateY(0);
 }
 
-/* Disconnect — tehlike kırmızısı */
+/* Disconnect — danger red */
 .main-btn.disconnect {
   color: var(--danger);
   border: 1px solid var(--danger-glow);
@@ -659,13 +687,11 @@ body {
 }
 
 .main-btn.icon-only.connect {
-  box-shadow: 0 6px 20px var(--accent-glow), 0 0 0 0 var(--accent-glow);
-  animation: main-btn-breathe 2.4s ease-in-out infinite;
+  box-shadow: 0 6px 20px var(--accent-glow);
 }
 
 .main-btn.icon-only.connect:hover:not(.processing) {
-  box-shadow: 0 8px 26px var(--accent-glow), 0 0 0 6px var(--accent-glow);
-  animation: none;
+  box-shadow: 0 8px 26px var(--accent-glow);
 }
 
 .main-btn.icon-only.disconnect {
@@ -744,7 +770,7 @@ body {
   color: var(--accent);
 }
 
-/* Settings — seçili öğe (glow) */
+/* Settings — selected item (glow) */
 .v2-item.v2-selected {
   background: var(--accent-softer) !important;
   box-shadow: inset 0 0 0 1px var(--accent-glow);
@@ -754,7 +780,7 @@ body {
   color: var(--accent) !important;
 }
 
-/* Sekme kutusu — kurumsal segmented control */
+/* Tab box — corporate segmented control */
 .v2-tabs {
   display: flex;
   flex: 0 0 auto;
@@ -816,10 +842,8 @@ body {
   justify-content: space-between;
   padding: 0.6rem 0.9rem 0.55rem;
   border-bottom: 1px solid var(--border-subtle);
-  background: rgba(10, 10, 18, 0.9);
+  background: var(--surface-1);
   gap: 0.5rem;
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
   flex-shrink: 0;
 }
 
@@ -838,7 +862,7 @@ body {
   gap: 4px;
 }
 
-/* Genel icon-button stili — tüm projede ortak kural */
+/* Shared icon-button style — project-wide rule */
 .icon-btn {
   display: inline-flex;
   align-items: center;
@@ -873,7 +897,7 @@ body {
   color: var(--accent, #ef4444);
 }
 
-/* Günlük filtre çubuğu (Faz 4) */
+/* Log filter bar (phase 4) */
 .logs-filter-bar {
   display: flex;
   gap: 6px;
@@ -1001,12 +1025,12 @@ body {
   color: var(--accent-green);
 }
 
-/* Eski logs-footer / logs-action-btn yapısı kaldırıldı (footer artık yok,
-   aksiyon butonları header'a taşındı ve .icon-btn ortak stilini kullanıyor) */
+/* Legacy logs-footer / logs-action-btn removed (no footer;
+   action buttons moved to header and use shared .icon-btn style) */
 .logs-footer { display: none; }
 .logs-action-btn { display: none; }
 
-/* Madde 1: Bottom nav icon-only */
+/* Item 1: Bottom nav icon-only */
 .nav-btn.nav-btn--icon {
   display: inline-flex;
   align-items: center;
@@ -1040,7 +1064,7 @@ body {
   box-shadow: 0 0 8px var(--accent-glow, rgba(0, 127, 255, 0.5));
 }
 
-/* Madde 3+4: Status summary + Health indicator aynı satırda */
+/* Item 3+4: Status summary + Health indicator on same row */
 .status-summary-row {
   display: flex;
   align-items: center;
@@ -1156,10 +1180,10 @@ body {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(9, 9, 11, 0.72);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  background: rgba(9, 9, 11, 0.88);
+  animation: lang-overlay-in 0.15s ease-out;
 }
+
 .lang-sheet-box {
   position: relative;
   width: 100%;
@@ -1169,6 +1193,29 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 18px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  animation: lang-sheet-in 0.15s ease-out;
+}
+
+@keyframes lang-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes lang-sheet-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lang-sheet-overlay,
+  .lang-sheet-box {
+    animation: none;
+  }
+}
+
+body.low-gpu-mode .lang-sheet-overlay,
+body.low-gpu-mode .lang-sheet-box {
+  animation: none;
 }
 .lang-sheet-header {
   display: flex;
@@ -1237,7 +1284,7 @@ body {
   color: var(--accent, #007fff);
 }
 
-/* Madde 3: Modern DNS picker kartları */
+/* Item 3: Modern DNS picker cards */
 .dns-section-header {
   display: flex;
   align-items: center;
@@ -1362,7 +1409,7 @@ body {
   background: var(--accent, #007fff);
 }
 
-/* Cihaz Bağla — sade QR modal */
+/* Connect device — simple QR modal */
 .connect-modal-overlay {
   position: fixed;
   inset: 0;
@@ -1371,9 +1418,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 0;
-  background: rgba(9, 9, 11, 0.7);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  background: rgba(9, 9, 11, 0.88);
 }
 .connect-modal-box {
   position: relative;
@@ -1404,7 +1449,7 @@ body {
   letter-spacing: 0.1px;
 }
 
-/* Sağ üst köşe — bağış + LAN bağlantı */
+/* Top-right corner — donate + LAN connect */
 .main-corner-bar {
   position: absolute;
   top: 36px;
@@ -1442,7 +1487,7 @@ body {
   flex-shrink: 0;
 }
 
-/* LAN connect — köşe bar içinde */
+/* LAN connect — inside corner bar */
 .lan-connect-corner-btn {
   position: static;
   background: var(--overlay-medium, rgba(255, 255, 255, 0.06));
@@ -1474,6 +1519,48 @@ body {
 }
 
 /* ==========================================
+   SETTINGS STANDALONE (minimal WebView2 tree)
+   ========================================== */
+.settings-standalone-root {
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-base);
+}
+
+.settings-standalone-root .v2-settings-overlay {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+}
+
+.settings-standalone-root .v2-item.v2-selected {
+  box-shadow: none;
+  outline: 1px solid var(--accent-glow);
+  outline-offset: -1px;
+}
+
+.settings-bottom-nav {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+/* Settings: avoid paint containment layer explosion */
+.settings-standalone-root .v2-item,
+.settings-standalone-root .v2-card,
+.settings-standalone-root .v2-dns-item,
+.v2-settings-overlay .v2-item,
+.v2-settings-overlay .v2-card,
+.v2-settings-overlay .v2-dns-item {
+  contain: none;
+}
+
+/* ==========================================
    SETTINGS OVERLAY
    ========================================== */
 .v2-settings-overlay {
@@ -1482,8 +1569,28 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--bg-base);
-  animation: slideIn 0.22s ease-out;
   inset: 0;
+}
+
+.v2-settings-content {
+  display: flex;
+  overflow-y: auto;
+  flex: 1;
+  flex-direction: column;
+  padding: 1.5rem;
+  padding-bottom: 120px;
+  gap: 2rem;
+  overscroll-behavior: contain;
+}
+
+body.low-gpu-mode .v2-settings-overlay,
+body.low-gpu-mode .v2-settings-overlay * {
+  transition: none !important;
+  animation: none !important;
+}
+
+.settings-tab-panel-wrap[hidden] {
+  display: none !important;
 }
 
 .v2-settings-header {
@@ -1492,9 +1599,7 @@ body {
   flex: 0 0 66px;
   padding: 0 1.5rem;
   border-bottom: 1px solid var(--border-subtle);
-  background: rgba(10, 10, 18, 0.9);
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
+  background: var(--surface-1);
   gap: 1rem;
 }
 
@@ -1521,16 +1626,6 @@ body {
 
 .v2-back-btn:hover {
   background: var(--overlay-medium);
-}
-
-.v2-settings-content {
-  display: flex;
-  overflow-y: auto;
-  flex: 1;
-  flex-direction: column;
-  padding: 1.5rem;
-  padding-bottom: 120px;
-  gap: 2rem;
 }
 
 .v2-section {
@@ -1579,7 +1674,7 @@ body {
   background: var(--overlay-subtle);
 }
 
-/* Sub-item (parent toggle açıkken görünen iç içe ayar) — sol kenara çekik */
+/* Sub-item (nested setting when parent toggle open) — indented left */
 .v2-item.v2-item--sub {
   position: relative;
   padding-left: 2.25rem;
@@ -1631,7 +1726,7 @@ body {
   color: var(--text-tertiary);
   font-size: var(--font-caption, 0.72rem);
   margin: 0;
-  /* Madde 2: tek satır ellipsis yerine en fazla 2 satır wrap */
+  /* Item 2: up to 2-line wrap instead of single-line ellipsis */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -1644,7 +1739,7 @@ body {
   background: var(--border-subtle);
 }
 
-/* Icons — kurumsal nötr varsayılan, accent yalnızca seçili durumda */
+/* Icons — corporate neutral default, accent only when selected */
 .v2-icon {
   display: flex;
   align-items: center;
@@ -1662,7 +1757,7 @@ body {
   height: 14px;
 }
 
-/* Tüm renk variant'ları tek nötr stile indiriliyor (geriye dönük uyum) */
+/* All color variants reduced to one neutral style (backward compatible) */
 .v2-icon.blue,
 .v2-icon.green,
 .v2-icon.yellow,
@@ -1673,7 +1768,7 @@ body {
   background: var(--surface-1);
 }
 
-/* Tek vurgu — seçili / aktif öğeler */
+/* Single accent — selected / active items */
 .v2-icon.accent,
 .v2-item.v2-selected .v2-icon,
 .v2-item.v2-selected .v2-icon.blue,
@@ -1723,7 +1818,6 @@ body {
   background: var(--text-primary);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   transition: transform var(--transition-base);
-  will-change: transform;
 }
 
 .v2-toggle.active .v2-toggle-thumb {
@@ -1817,7 +1911,7 @@ body {
   background: var(--success-soft);
 }
 
-/* Bilgi / uyarı banner'ları */
+/* Info / warning banners */
 .info-banner {
   display: flex;
   align-items: flex-start;
@@ -1875,7 +1969,7 @@ body {
   color: var(--accent);
 }
 
-/* Npcap / uyarı ikonları */
+/* Npcap / warning icons */
 .v2-icon--warning {
   border-color: var(--warning-border) !important;
   color: var(--warning) !important;
@@ -1888,7 +1982,7 @@ body {
   background: var(--success-soft) !important;
 }
 
-/* Kurumsal ikincil aksiyon butonu */
+/* Corporate secondary action button */
 .btn-install {
   display: flex;
   align-items: center;
@@ -1943,7 +2037,7 @@ body {
   font-weight: 600;
 }
 
-/* Modern Özel Bypass Listesi */
+/* Modern custom bypass list */
 .custom-bypass-header {
   margin-bottom: 8px;
   padding: 0 4px;
@@ -2083,7 +2177,7 @@ body {
   background: rgba(239, 68, 68, 0.1);
 }
 
-/* Defender Exclusion bölümü */
+/* Defender Exclusion section */
 .defender-card {
   padding: 12px;
 }
@@ -2138,7 +2232,7 @@ body {
   margin-top: 8px;
 }
 
-/* Madde 7: Ortak CTA buton standardı — Primary / Secondary */
+/* Item 7: Shared CTA button standard — Primary / Secondary */
 .cta-row {
   display: flex;
   gap: 10px;
@@ -2185,7 +2279,7 @@ body {
   transform: none;
 }
 
-/* Defender Settings içindeki "İstisnayı Şimdi Ekle" — aynı standart, full width */
+/* Defender Settings "Add Exclusion Now" — same standard, full width */
 .defender-add-btn {
   width: 100%;
   margin-top: 8px;
@@ -2237,7 +2331,7 @@ body {
   color: #fff;
 }
 
-/* Canlı bypass grafiği */
+/* Live bypass graph */
 .bypass-graph {
   width: 100%;
   padding: 8px 12px 6px;
@@ -2420,24 +2514,74 @@ body {
    PERFORMANCE OPTIMIZATIONS
    ========================================== */
 
-/* GPU acceleration - use sparingly */
-.main-btn,
-.logs-action-btn,
-.v2-toggle-thumb {
+.settings-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.settings-tab-panel--connection {
+  gap: 1.5rem;
+}
+
+/* will-change only on hover/active — no idle GPU reservation */
+.main-btn:hover:not(.processing),
+.logs-action-btn:hover {
   will-change: transform;
 }
 
-/* Prevent layout shifts */
-.shield-circle,
-.v2-card,
-.v2-dns-item,
-.v2-item {
+/* Main screen only — paint containment on settings items caused extra compositor layers */
+.shield-circle {
   contain: layout style paint;
+}
+
+.main-content .v2-card,
+.main-content .v2-dns-item,
+.main-content .v2-item {
+  contain: layout style;
 }
 
 /* Reduce paint areas on scroll */
 .console-content {
   contain: layout style;
+}
+
+/* Low GPU mode + system reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .shield-wave,
+  .health-indicator.is-ok .health-indicator-dot,
+  .bypass-graph-pulse.is-live,
+  .main-btn.icon-only.connect,
+  .spinning,
+  .fade-in {
+    animation: none !important;
+  }
+
+  .shield-circle.connected {
+    animation: none;
+  }
+}
+
+body.low-gpu-mode .shield-wave,
+body.low-gpu-mode .health-indicator.is-ok .health-indicator-dot,
+body.low-gpu-mode .bypass-graph-pulse.is-live,
+body.low-gpu-mode .main-btn.icon-only.connect,
+body.low-gpu-mode .shield-circle.connected,
+body.low-gpu-mode .fade-in {
+  animation: none !important;
+}
+
+body.low-gpu-mode .app-logo,
+body.low-gpu-mode .app-logo--hero {
+  filter: none;
+}
+
+body.low-gpu-mode .v2-settings-overlay {
+  animation: none;
+}
+
+body.low-gpu-mode .logs-overlay {
+  animation: none;
 }
 
 /* Connection Modal Styles */
@@ -2493,8 +2637,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(5px);
+  background: rgba(0, 0, 0, 0.88);
 }
 
 .connection-modal {

@@ -185,6 +185,33 @@ DPIReaper ships in 12 languages. When adding a UI string:
 
 ---
 
+## GPU usage diagnosis (WebView2)
+
+High GPU usage reports are usually **not** caused by `dpireaper-proxy.exe` (network sidecar — CPU only) or Windows Defender exclusions. The main GPU consumer is **WebView2** (`msedgewebview2.exe`, Chromium GPU Process + Renderer) hosting the UI.
+
+### How to verify (Windows Task Manager)
+
+1. Open **Task Manager** → **Processes** (or **Details**).
+2. Enable the **GPU** and **GPU engine** columns (right-click column headers).
+3. Compare three scenarios with DPIReaper:
+
+| Scenario | Expected GPU user |
+|----------|-------------------|
+| Main screen idle | `msedgewebview2.exe` (GPU 3D) |
+| Settings open | Same — may spike briefly on tab switch |
+| Connected | `dpireaper-proxy.exe` should show **0% GPU** |
+
+4. Expand the **DPIReaper** process group: you should see `DPIReaper.exe`, several `msedgewebview2.exe` children, and (when connected) `dpireaper-proxy.exe`.
+
+### Mitigations built into the app
+
+- **Settings → General → Low GPU mode** — disables heavy CSS animations and blur; syncs a pref for WebView2 `--disable-gpu-compositing` on **next restart**.
+- Windows 10 + integrated GPUs often report higher percentages than Windows 11 on the same hardware (WDDM / compositor differences).
+
+When filing a GPU-related bug, include Windows build, GPU model, DPIReaper version, whether Low GPU mode is on, and GPU % for idle vs. Settings vs. connected.
+
+---
+
 ## Security issues
 
 **Do not** open public issues for security vulnerabilities. See [SECURITY.md](SECURITY.md) for the disclosure process.

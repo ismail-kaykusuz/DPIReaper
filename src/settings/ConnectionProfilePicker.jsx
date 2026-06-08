@@ -124,4 +124,4 @@ const ConnectionProfilePicker = ({ config, updateConfig, t, compact = false, isp
   );
 };
 
-export default ConnectionProfilePicker;
+export default React.memo(ConnectionProfilePicker);

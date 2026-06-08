@@ -1,16 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, X, Check } from 'lucide-react';
 import { SUPPORTED_LANGUAGES } from '../i18n';
 
 /**
- * Modern dil seçici:
- *  - Trigger: küçük kart (mevcut dil bayrağı + adı + chevron)
- *  - Sheet: 2-sütun grid, her hücre küçük dil kartı (bayrak + native isim)
- *  - Seçili dilde accent border + tick
- *  - ESC ile kapatma, dış tıklama ile kapatma
- *
- * Onboarding'de inline=true ile sadece grid render edilir (trigger yok).
+ * Modern language picker — CSS transitions (no Framer Motion, low CPU).
  */
 const LanguagePicker = ({ value, onChange, t, inline = false }) => {
   const [open, setOpen] = useState(false);
@@ -53,7 +46,6 @@ const LanguagePicker = ({ value, onChange, t, inline = false }) => {
   );
 
   if (inline) {
-    // Onboarding adım 0: trigger yok, sadece grid
     return Grid;
   }
 
@@ -78,44 +70,35 @@ const LanguagePicker = ({ value, onChange, t, inline = false }) => {
         </div>
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="lang-sheet-overlay"
-            onClick={() => setOpen(false)}
+      {open && (
+        <div
+          className="lang-sheet-overlay lang-sheet-overlay--open"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="lang-sheet-box lang-sheet-box--open"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
           >
-            <motion.div
-              initial={{ scale: 0.97, opacity: 0, y: 12 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.97, opacity: 0, y: 12 }}
-              transition={{ type: 'spring', damping: 28, stiffness: 340 }}
-              className="lang-sheet-box"
-              onClick={(e) => e.stopPropagation()}
-              role="dialog"
-              aria-modal="true"
-            >
-              <div className="lang-sheet-header">
-                <button
-                  type="button"
-                  className="icon-btn"
-                  onClick={() => setOpen(false)}
-                  aria-label="Kapat"
-                  title="Kapat"
-                >
-                  <X size={16} />
-                </button>
-                <h2 className="lang-sheet-title">{t.languageSheetTitle || 'Pick a language'}</h2>
-              </div>
-              {Grid}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <div className="lang-sheet-header">
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setOpen(false)}
+                aria-label="Kapat"
+                title="Kapat"
+              >
+                <X size={16} />
+              </button>
+              <h2 className="lang-sheet-title">{t.languageSheetTitle || 'Pick a language'}</h2>
+            </div>
+            {Grid}
+          </div>
+        </div>
+      )}
     </>
   );
 };
 
-export default LanguagePicker;
+export default React.memo(LanguagePicker);

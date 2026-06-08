@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
 import {
   ChevronLeft, Globe, Activity, AlertTriangle, Check, Wrench, Gamepad2, RotateCw,
   ShieldCheck, Plus, Trash2, MessageCircle,
@@ -9,7 +8,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { APP, URLS } from '../constants';
 import Toggle from './Toggle';
 
-/** Ayarlar → GELİŞMİŞ sekmesi (sıralama: Defender → Custom bypass → Sorun Giderme → Uzman Ayarları → Hakkında). */
+/** Settings → ADVANCED tab (order: Defender → Custom bypass → Troubleshoot → Expert settings → About). */
 const SettingsAdvancedTab = ({
   config,
   updateConfig,
@@ -20,8 +19,9 @@ const SettingsAdvancedTab = ({
   currentPort = 0,
   defenderDecision = null,
   requestDefenderExclusion = async () => false,
+  isActive = true,
 }) => {
-  // C18: Network interfaces (read-only bilgilendirme)
+  // C18: Network interfaces (read-only info)
   const [interfaces, setInterfaces] = useState([]);
 
   const [newDomain, setNewDomain] = useState('');
@@ -30,10 +30,11 @@ const SettingsAdvancedTab = ({
   const [defenderBusy, setDefenderBusy] = useState(false);
 
   useEffect(() => {
+    if (!isActive) return;
     invoke('list_network_interfaces').then((list) => {
       if (Array.isArray(list)) setInterfaces(list);
     }).catch(() => {});
-  }, []);
+  }, [isActive]);
 
   const addCustomDomain = useCallback(() => {
     const d = newDomain.trim().toLowerCase();
@@ -70,15 +71,8 @@ const SettingsAdvancedTab = ({
   };
 
   return (
-    <motion.div
-      key="advanced-tab"
-      initial={{ opacity: 0, x: -15 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 15 }}
-      transition={{ duration: 0.2, ease: 'easeInOut' }}
-      style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
-    >
-      {/* 1) Windows Defender İstisnası — güvenlik kritik, en üst */}
+    <div className="settings-tab-panel">
+      {/* 1) Windows Defender exclusion — security critical, top */}
       <div className="v2-section">
         <div className="v2-section-title">{t.sectionDefender}</div>
         <div className="v2-card defender-card">
@@ -116,7 +110,7 @@ const SettingsAdvancedTab = ({
         </div>
       </div>
 
-      {/* 2) Özel Bypass Listesi */}
+      {/* 2) Custom bypass list */}
       <div className="v2-section">
         <div className="custom-bypass-header">
           <h2>{t.sectionCustomBypass}</h2>
@@ -168,7 +162,7 @@ const SettingsAdvancedTab = ({
         </div>
       </div>
 
-      {/* 3) Sorun Giderme */}
+      {/* 3) Troubleshooting */}
       <div className="v2-section">
         <div className="v2-section-title">{t.sectionTroubleshoot}</div>
         <div className="v2-card">
@@ -203,7 +197,7 @@ const SettingsAdvancedTab = ({
         </div>
       </div>
 
-      {/* 4) Uzman Ayarları — IPv4 + WinHTTP toggle'ları. LAN sharing artık Bağlantı sekmesinde. */}
+      {/* 4) Expert settings — IPv4 + WinHTTP toggles. LAN sharing is now on Connection tab. */}
       <div className="v2-section">
         <div className="v2-section-title">{t.sectionAdvancedNetwork}</div>
         <div className="v2-card">
@@ -226,7 +220,7 @@ const SettingsAdvancedTab = ({
           </div>
         </div>
 
-        {/* C18: Algılanan ağ arayüzleri (read-only) */}
+        {/* C18: Detected network interfaces (read-only) */}
         {interfaces.length > 0 && (
           <div style={{ marginTop: 8, padding: '8px 12px', background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', borderRadius: 8 }}>
             <div style={{ fontSize: 'var(--font-micro, 0.66rem)', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)', marginBottom: 4 }}>
@@ -242,7 +236,7 @@ const SettingsAdvancedTab = ({
         )}
       </div>
 
-      {/* 5) Hakkında — en altta */}
+      {/* 5) About — at bottom */}
       <div className="v2-section">
         <div className="v2-section-title">{t.sectionAbout}</div>
         <div className="v2-card">
@@ -297,8 +291,8 @@ const SettingsAdvancedTab = ({
           {t.aboutCopyright}
         </p>
       </div>
-    </motion.div>
+    </div>
   );
 };
 
-export default SettingsAdvancedTab;
+export default React.memo(SettingsAdvancedTab);

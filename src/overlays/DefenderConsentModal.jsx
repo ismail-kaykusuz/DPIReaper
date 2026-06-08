@@ -3,9 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck } from 'lucide-react';
 
 /**
- * Defender exclusion için onaylı dialog. İlk açılışta veya kullanıcı henüz
- * karar vermediğinde gösterilir. "Şimdi ekle" → UAC + add_defender_exclusions.
- * "Daha sonra" → flag = 'declined', modal bir daha çıkmaz.
+ * Consent dialog for Defender exclusion. Shown on first launch or when user has not
+ * decided yet. "Add now" → UAC + add_defender_exclusions.
+ * "Later" → flag = 'declined', modal does not appear again.
  */
 const DefenderConsentModal = ({ open, t, onAccept, onDecline }) => {
   const [busy, setBusy] = useState(false);

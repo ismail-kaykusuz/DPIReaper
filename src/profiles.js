@@ -1,13 +1,13 @@
 // ═══════════════════════════════════════════════════════════════════
-// profiles.js — Tek Merkezi Yapılandırma Dosyası
+// profiles.js — Single Central Configuration File
 //
-// Tüm bypass modları, chunk seçenekleri ve engine argümanları
-// buradan yönetilir.
+// All bypass modes, chunk options, and engine arguments
+// are managed here.
 // ═══════════════════════════════════════════════════════════════════
 
-// ─── CHUNK SIZE VARSAYILANLARI ─────────────────────────────────
-// Yalnız 3 profil mevcut: fast (4) · recommended (2) · max (1).
-// 8-byte profil tasarımdan kaldırıldı.
+// ─── CHUNK SIZE DEFAULTS ─────────────────────────────────
+// Only 3 profiles: fast (4) · recommended (2) · max (1).
+// 8-byte profile removed from design.
 export const DEFAULT_CHUNKS = {
   '0': 4,
   '1': 2,
@@ -17,7 +17,7 @@ export const DEFAULT_CHUNKS = {
 export const VALID_CHUNK_SIZES = [1, 2, 4];
 export const VALID_DPI_METHODS = ['0', '1', '2'];
 
-// ─── KULLANICIYA GÖSTERİLEN BAĞLANTI PROFİLLERİ ──────────────────
+// ─── USER-FACING CONNECTION PROFILES ──────────────────
 export const PROFILE_TIERS = {
   fast:        { mode: '0', chunk: 4, profileId: 'light' },
   recommended: { mode: '1', chunk: 2, profileId: 'mid' },
@@ -53,7 +53,7 @@ export function getEffectiveChunkSize(dpiMethod, httpsChunkSize) {
 }
 
 /**
- * SpoofDPI (dpireaper-proxy) sidecar argümanları.
+ * SpoofDPI (dpireaper-proxy) sidecar arguments.
  * @returns {{ args: string[], logs: Array<{ key: string, type?: string, params?: unknown[] }> }}
  */
 export function buildProxyEngineArgs({
@@ -65,8 +65,8 @@ export function buildProxyEngineArgs({
   dohUrl,
 }) {
   const logs = [];
-  // PERF: 'info' seviyesi yoğun trafikte saniyede yalnızca 10-50 satır üretir.
-  // Bu seviye günlük kullanımda yaklaşık %1 CPU yükü oluşturur.
+  // PERF: 'info' level produces only 10-50 lines/sec under heavy traffic.
+  // This level adds ~1% CPU load in daily use.
   const args = [
     '--clean',
     '--listen-addr', listenAddr,

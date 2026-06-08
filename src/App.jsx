@@ -6,7 +6,7 @@ import UpdateAvailableModal from "./overlays/UpdateAvailableModal";
 import { createBypassStatsTracker } from "./bypassStats";
 import { detectProfileTier } from "./profiles";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Command, open as openShell } from "@tauri-apps/plugin-shell";
 import { invoke } from "@tauri-apps/api/core";
 import { getTranslations, detectSystemLang } from "./i18n";
@@ -42,7 +42,7 @@ import { QRCodeSVG } from "qrcode.react";
 
 import "./App.css";
 
-// ✅ Constants — constants.js'den import ediliyor (DNS_MAP, DOH_MAP, APP, RETRY_DELAYS, DPI_TIMEOUTS, LS_KEYS)
+// ✅ Constants — imported from constants.js (DNS_MAP, DOH_MAP, APP, RETRY_DELAYS, DPI_TIMEOUTS, LS_KEYS)
 
 const PURIFY_CONFIG = { ALLOWED_TAGS: ['strong', 'em', 'br', 'span', 'b'], ALLOWED_ATTR: ['class'] };
 
@@ -50,28 +50,27 @@ function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [logs, setLogs] = useState([]);
   const [currentPort, setCurrentPort] = useState(8080);
-  const currentPortRef = useRef(8080); // ✅ #6: Stale closure önleme
+  const currentPortRef = useRef(8080); // ✅ #6: Prevent stale closure
   const [lanIp, setLanIp] = useState("127.0.0.1"); // ✅ LAN IP State
-  const [pacPort, setPacPort] = useState(8787); // ✅ PAC port (dinamik)
+  const [pacPort, setPacPort] = useState(8787); // ✅ PAC port (dynamic)
   const [showConnectionModal, setShowConnectionModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
-  const [logFilter, setLogFilter] = useState('all'); // Faz 4 — günlük filtresi
+  const [logFilter, setLogFilter] = useState('all'); // Phase 4 — log filter
   const [showSettings, setShowSettings] = useState(false);
   const [isAdmin, setIsAdmin] = useState(true);
-  const [isOnline, setIsOnline] = useState(navigator.onLine); // ✅ Internet Durumu
-  const [dnsLatencies, setDnsLatencies] = useState({}); // ✅ #5: DNS ping sonuçları kalcı
+  const [isOnline, setIsOnline] = useState(navigator.onLine); // ✅ Internet status
   const [appIsClosingState, setAppIsClosingState] = useState(false); // Shutdown UX
   const [closingStep, setClosingStep] = useState(0);
   const [closingDots, setClosingDots] = useState("");
   const [ispDetection, setIspDetection] = useState(null);
-  // ✅ İlk giriş overlay state — config bile yoksa göster (A12 double-guard)
-  // Bu state, aşağıdaki useEffect dependency array'leri bu değeri okuduğu için
-  // erken declare edilmek zorunda (yoksa TDZ ReferenceError → siyah ekran).
+  // ✅ First-run overlay state — show even when config is missing (A12 double-guard)
+  // This state must be declared early because useEffect dependency arrays below read it
+  // otherwise TDZ ReferenceError → black screen.
   const [showFirstRunISS, setShowFirstRunISS] = useState(() => {
     return !localStorage.getItem(LS_KEYS.firstRun) && !localStorage.getItem(LS_KEYS.config);
   });
-  // Defender consent durumu — 'added' | 'declined' | null (henüz sorulmadı)
+  // Defender consent durumu — 'added' | 'declined' | null (not asked yet)
   const [defenderDecision, setDefenderDecision] = useState(() =>
     localStorage.getItem(LS_KEYS.defenderExclusionDecision)
   );
@@ -79,19 +78,22 @@ function App() {
   const [updateInfo, setUpdateInfo] = useState(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [bypassStats, setBypassStats] = useState(null);
-  // C5: Sidecar sağlık durumu — { ok: bool, latencyMs: number } | null
+  // C5: Sidecar health status — { ok: bool, latencyMs: number } | null
   const [healthStatus, setHealthStatus] = useState(null);
-  // C6: Onboarding adımı (0/1/2)
+  // C6: Onboarding step (0/1/2)
   const [onboardingStep, setOnboardingStep] = useState(0);
   const bypassTrackerRef = useRef(null);
   const bypassPendingRef = useRef(null);
   const bypassFlushTimerRef = useRef(null);
-  // PERF: log satırlarını rAF/100ms ile gruplayıp tek setState'te yaz
+  // PERF: batch log lines via rAF/100ms into a single setState
   const logQueueRef = useRef([]);
   const logFlushRafRef = useRef(0);
+  const overlayActiveRef = useRef(false);
+  const settingsSnapRef = useRef(null);
 
-  // ingest() her satırda setState yerine 250ms'de bir flush — re-render maliyetini düşürür
+  // flush ingest() every 250ms instead of setState per line — lowers re-render cost
   const flushBypassStats = (snap) => {
+    if (overlayActiveRef.current) return;
     bypassPendingRef.current = snap;
     if (bypassFlushTimerRef.current) return;
     bypassFlushTimerRef.current = setTimeout(() => {
@@ -108,7 +110,7 @@ function App() {
       bypassTrackerRef.current = createBypassStatsTracker();
       setBypassStats(bypassTrackerRef.current.snapshot());
     }
-    // B3: ISS tespiti — 24 saatlik cache, yoksa async invoke
+    // B3: ISP detection — 24h cache, otherwise async invoke
     try {
       const cached = localStorage.getItem(LS_KEYS.ispCache);
       if (cached) {
@@ -137,9 +139,9 @@ function App() {
     };
   }, []);
 
-  // PERF: Heartbeat — sayfa görünür değilse durdur, görünürse 1sn'de bir grafik tick'i
+  // PERF: Heartbeat — stop when page hidden or settings/logs overlay open
   useEffect(() => {
-    if (!isConnected) return undefined;
+    if (!isConnected || showSettings || showLogs) return undefined;
     let id = null;
     const start = () => {
       if (id || document.visibilityState === 'hidden') return;
@@ -162,12 +164,11 @@ function App() {
       stop();
       document.removeEventListener('visibilitychange', onVisChange);
     };
-  }, [isConnected]);
+  }, [isConnected, showSettings, showLogs]);
 
-  // C5: Sidecar sağlık kontrolü — bağlandıktan sonra 5sn'de ilk test, sonra 30sn'de bir
+  // C5: Sidecar health check — stop while settings/logs open
   useEffect(() => {
-    if (!isConnected) {
-      setHealthStatus(null);
+    if (!isConnected || showSettings || showLogs) {
       return undefined;
     }
     let cancelled = false;
@@ -181,7 +182,7 @@ function App() {
             addLog(t.logHealthFail, 'warn', { i18nKey: 'logHealthFail' });
           }
         }
-      } catch (_) { /* sessizce yut */ }
+      } catch (_) { /* swallow silently */ }
     };
     const firstId = setTimeout(runCheck, 5000);
     const intervalId = setInterval(runCheck, 30000);
@@ -190,9 +191,9 @@ function App() {
       clearTimeout(firstId);
       clearInterval(intervalId);
     };
-  }, [isConnected]);
+  }, [isConnected, showSettings, showLogs]);
 
-  // C14: Mount'ta sidecar binary varlığını doğrula
+  // C14: Verify sidecar binary exists on mount
   useEffect(() => {
     invoke('check_sidecar_exists').then((exists) => {
       if (!exists) {
@@ -201,8 +202,8 @@ function App() {
     }).catch(() => {});
   }, []);
 
-  // Madde 1: --autostart ile başlatıldıysa pencereyi tray'e gizle.
-  // Non-elevated autostart bypass'i bozar — yönetici olarak yeniden başlat.
+  // Item 1: hide window to tray when launched with --autostart.
+  // Non-elevated autostart breaks bypass — relaunch as admin.
   useEffect(() => {
     (async () => {
       try {
@@ -241,7 +242,7 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // GitHub Releases — ilk kurulum overlay kapandiktan sonra kontrol et.
+  // GitHub Releases — check after first-run overlay closes.
   useEffect(() => {
     if (showFirstRunISS) return undefined;
     let cancelled = false;
@@ -260,7 +261,7 @@ function App() {
     return () => { cancelled = true; };
   }, [showFirstRunISS]);
 
-  // Defender consent modal: onboarding tamamlanmış ve henüz karar verilmemişse göster
+  // Defender consent modal: show when onboarding complete and no decision yet
   useEffect(() => {
     if (showFirstRunISS) return;
     if (!isAdmin) return;
@@ -275,7 +276,7 @@ function App() {
       setDefenderDecision('added');
       setShowDefenderConsent(false);
     } catch (e) {
-      // UAC reddi veya başka bir hata — flag SET ETME, modal sonraki açılışta tekrar çıkar
+      // UAC denial or other error — do NOT set flag; modal reappears next launch
       addLog(t.logDefenderExclusionFailed, 'warn', { i18nKey: 'logDefenderExclusionFailed' });
       setShowDefenderConsent(false);
     }
@@ -285,19 +286,6 @@ function App() {
     localStorage.setItem(LS_KEYS.defenderExclusionDecision, 'declined');
     setDefenderDecision('declined');
     setShowDefenderConsent(false);
-  };
-
-  // Settings içinden Defender bölümü "İstisnayı Şimdi Ekle" butonu için
-  const requestDefenderExclusion = async () => {
-    try {
-      await invoke('add_defender_exclusions');
-      localStorage.setItem(LS_KEYS.defenderExclusionDecision, 'added');
-      setDefenderDecision('added');
-      return true;
-    } catch (e) {
-      addLog(t.logDefenderExclusionFailed, 'warn', { i18nKey: 'logDefenderExclusionFailed' });
-      return false;
-    }
   };
 
   useEffect(() => {
@@ -353,12 +341,12 @@ function App() {
   // Settings State
   const [config, setConfig] = useState(() => {
     const defaultSettings = {
-      // Madde 5: İlk açılışta sistem dilini otomatik tespit et (EN fallback)
+      // Item 5: auto-detect system language on first launch (EN fallback)
       language: detectSystemLang(),
       autoStart: false,
       autoConnect: false,
       minimizeToTray: false,
-      // İlk kurulumda Otomatik DNS önerilir — en hızlı sunucuyu kendisi seçer.
+      // On first setup, Auto DNS is recommended — picks the fastest server.
       dnsMode: "auto",
       selectedDns: "cloudflare",
       autoReconnect: true,
@@ -381,7 +369,7 @@ function App() {
         const parsed = JSON.parse(parsedStr);
         if (typeof parsed !== 'object' || parsed === null) return defaultSettings;
 
-        // Migration: 'system' DNS seçeneği UI'dan kaldırıldı, otomatik seçime taşı
+        // Migration: 'system' DNS option removed from UI, migrate to auto select
         let migratedDns = parsed.selectedDns;
         let migratedMode = parsed.dnsMode;
         if (migratedDns === 'system') {
@@ -389,7 +377,7 @@ function App() {
           migratedMode = 'auto';
         }
 
-        // Migration: 8-byte ve üstü chunk seçenekleri tasarımdan kaldırıldı (sadece 1/2/4).
+        // Migration: 8-byte and larger chunk options removed from design (only 1/2/4).
         let migratedChunk = Number(parsed.httpsChunkSize);
         if ([1, 2, 4].includes(migratedChunk)) {
           // tut
@@ -399,9 +387,14 @@ function App() {
           migratedChunk = defaultSettings.httpsChunkSize;
         }
 
-        // Migration (A6): lowCpuMode artık yok, sil
+        // Migration (A6): drop legacy lowCpuMode / lowGpuMode keys
         // eslint-disable-next-line no-unused-vars
-        const { lowCpuMode: _legacyLowCpu, advancedBypass: _legacyAdv, ...rest } = parsed;
+        const {
+          lowCpuMode: _legacyLowCpu,
+          lowGpuMode: _legacyLowGpu,
+          advancedBypass: _legacyAdv,
+          ...rest
+        } = parsed;
 
         return {
           ...defaultSettings,
@@ -422,7 +415,7 @@ function App() {
     return defaultSettings;
   });
 
-  // ✅ i18n: Reactive translations (config'den sonra olmalı!)
+  // ✅ i18n: Reactive translations (must come after config!)
   const t = useMemo(
     () => getTranslations(config.language || "tr"),
     [config.language],
@@ -433,12 +426,12 @@ function App() {
   const logsEndRef = useRef(null);
   const isRetrying = useRef(false);
 
-  // ✅ Auto-reconnect mekanizması
+  // ✅ Auto-reconnect mechanism
   const retryCount = useRef(0);
   const retryTimer = useRef(null);
   const userIntentDisconnect = useRef(false);
   const fatalErrorRef = useRef(false);
-  // ✅ Çıkış işlemi başladı mı? (çift modal engellemek için)
+  // ✅ Has exit started? (prevent double modal)
   const isExiting = useRef(false);
   const trayQuitRef = useRef(false);
   const prevLanSharingRef = useRef(config.lanSharing ?? false);
@@ -449,9 +442,9 @@ function App() {
   const prevEnableWinhttpRef = useRef(config.enableWinhttp !== false);
   const prevIpv4OnlyRef = useRef(config.ipv4Only !== false);
 
-  // DNS_MAP ve DOH_MAP artık component dışında tanımlı (yukarıda)
+  // DNS_MAP and DOH_MAP are now defined outside the component (above)
 
-  // B9: localStorage yazımı 200ms debounce — hızlı toggle tıklamalarında biriktir.
+  // B9: localStorage writes debounced 200ms — batch rapid toggle clicks.
   const configWriteTimerRef = useRef(null);
   const pendingConfigRef = useRef(null);
   const flushConfigToStorage = (cfg) => {
@@ -481,7 +474,7 @@ function App() {
       return newConfig;
     });
   };
-  // Uygulama kapanırken pending config'i sync yaz
+  // Sync-write pending config on app close
   const flushPendingConfig = () => {
     if (configWriteTimerRef.current) {
       clearTimeout(configWriteTimerRef.current);
@@ -522,7 +515,7 @@ function App() {
 
   const notifyUser = async (title, body, eventType) => {
     try {
-      if (configRef.current.notifications === false) return; // Kullanıcı bildirimleri kapattıysa
+      if (configRef.current.notifications === false) return; // Skip if user disabled notifications
       if (
         eventType === "connect" &&
         configRef.current.notifyOnConnect === false
@@ -562,10 +555,11 @@ function App() {
     return value;
   };
 
-  // PERF: setState'i her satırda değil, requestAnimationFrame'de bir kez tetikle.
-  // Yoğun trafikte saniyede 100+ log gelirse: önceden 100 re-render → şimdi ~60.
+  // PERF: Trigger setState once in requestAnimationFrame, not per line.
+  // Under heavy traffic (100+ logs/s): was 100 re-renders → now ~60.
   const flushLogQueue = () => {
     logFlushRafRef.current = 0;
+    if (overlayActiveRef.current) return;
     const queued = logQueueRef.current;
     if (queued.length === 0) return;
     logQueueRef.current = [];
@@ -594,12 +588,12 @@ function App() {
       i18nKey: i18nKey || null,
       i18nParams: i18nParams || null,
     });
-    if (!logFlushRafRef.current) {
+    if (!overlayActiveRef.current && !logFlushRafRef.current) {
       logFlushRafRef.current = requestAnimationFrame(flushLogQueue);
     }
   };
 
-  // B8: Dil değiştiğinde tüm log array'ini map'lemek yerine render anında çöz.
+  // B8: Resolve logs at render time instead of remapping entire array on language change.
   const getLogText = (log) => {
     if (!log) return "";
     if (log.i18nKey) {
@@ -657,12 +651,12 @@ function App() {
     }
   };
 
-  // ✅ Exponential backoff hesaplama — ilk retry'da da 2.5s bekle (TIME_WAIT)
+  // ✅ Exponential backoff — wait 2.5s on first retry too (TIME_WAIT)
   const getRetryDelay = (attempt) => {
     return RETRY_DELAYS[Math.min(attempt, RETRY_DELAYS.length - 1)];
   };
 
-  // ✅ Tray tooltip güncelle — configRef + currentPortRef kullanarak stale closure önlenir
+  // ✅ Update tray tooltip — configRef + currentPortRef prevent stale closure
   const updateTrayTooltip = async (status) => {
     try {
       let tooltip = "";
@@ -686,13 +680,13 @@ function App() {
       }
       await invoke("update_tray_tooltip", { tooltip });
     } catch (e) {
-      console.error("Tray tooltip güncelleme hatası:", e);
+      console.error("Tray tooltip update failed:", e);
     }
   };
 
-  // ✅ Otomatik yeniden bağlanma
+  // ✅ Automatic reconnect
   const attemptReconnect = () => {
-    // Timer varsa temizle
+    // Clear timer if set
     if (retryTimer.current) {
       clearTimeout(retryTimer.current);
       retryTimer.current = null;
@@ -702,10 +696,10 @@ function App() {
     const maxAttempts = APP.maxReconnectAttempts;
 
     if (currentAttempt >= maxAttempts) {
-      // Maksimum deneme aşıldı
-      addLog(`❌ ${t.logMaxRetries}`, "error", { i18nKey: "logMaxRetries" });
+      // Max attempts exceeded
+      addLog(t.logMaxRetries, "error", { i18nKey: "logMaxRetries" });
       addLog("", "info");
-      addLog(`📋 ${t.logPossibleReasons}`, "warn", {
+      addLog(t.logPossibleReasons, "warn", {
         i18nKey: "logPossibleReasons",
       });
       addLog(`  • ${t.logReasonInternet}`, "info", {
@@ -716,7 +710,7 @@ function App() {
       });
       addLog(`  • ${t.logReasonPorts}`, "info", { i18nKey: "logReasonPorts" });
       addLog("", "info");
-      addLog(`💡 ${t.logSolutions}`, "warn", { i18nKey: "logSolutions" });
+      addLog(t.logSolutions, "warn", { i18nKey: "logSolutions" });
       addLog(`  • ${t.logSolInternet}`, "info", { i18nKey: "logSolInternet" });
       addLog(`  • ${t.logSolFirewall}`, "info", { i18nKey: "logSolFirewall" });
       addLog(`  • ${t.logSolAdmin}`, "info", { i18nKey: "logSolAdmin" });
@@ -731,7 +725,7 @@ function App() {
     retryCount.current++;
 
     if (delay === 0) {
-      addLog(`🔄 ${t.logReconnecting(currentAttempt + 1)}`, "warn", {
+      addLog(t.logReconnecting(currentAttempt + 1), "warn", {
         i18nKey: "logReconnecting",
         i18nParams: [currentAttempt + 1],
       });
@@ -747,7 +741,7 @@ function App() {
       );
       updateTrayTooltip("retrying");
       retryTimer.current = setTimeout(() => {
-        addLog(`🔄 ${t.logReconnectNow}`, "info", {
+        addLog(t.logReconnectNow, "info", {
           i18nKey: "logReconnectNow",
         });
         startEngine(8080);
@@ -755,7 +749,7 @@ function App() {
     }
   };
 
-  // Port açık mı? Rust ile TCP bağlantı dener
+  // Is port open? Rust tries TCP connection
   const waitForPort = async (port, maxAttempts = APP.portCheckMaxAttempts) => {
     for (let i = 0; i < maxAttempts; i++) {
       try {
@@ -770,7 +764,7 @@ function App() {
   };
 
   const startEngine = async (ignoredPort, portRetryCount = 0) => {
-    // Takili kilit / olü sidecar referansini temizle
+    // Clear stuck lock / dead sidecar reference
     if (isStartingEngine.current && !childProcess.current) {
       isStartingEngine.current = false;
     }
@@ -780,7 +774,7 @@ function App() {
 
     updateTrayTooltip("connecting");
 
-    // ✅ #2: fatalErrorRef'i sıfırla — önceki oturumdaki wpcap hatası yeni bağlantıyı bloklamasın
+    // ✅ #2: Reset fatalErrorRef — previous wpcap error must not block new connection
     fatalErrorRef.current = false;
 
     // Max 20 retries
@@ -822,7 +816,7 @@ function App() {
     }
     await clearProxy(true);
 
-    // ✅ #3: configRef.current kullan — stale closure önlenir
+    // ✅ #3: Use configRef.current — prevents stale closure
     const currentDns = configRef.current.selectedDns;
     const dnsIP = DNS_MAP[currentDns];
 
@@ -844,7 +838,7 @@ function App() {
     isRetrying.current = false;
 
     try {
-      // ✅ Yeni 3-mod timeout sistemi: 0=Turbo, 1=Dengeli, 2=Güçlü
+      // ✅ New 3-mode timeout system: 0=Turbo, 1=Balanced, 2=Strong
       const TIMEOUT_MS = DPI_TIMEOUTS[configRef.current.dpiMethod] ?? 5000;
 
       const listenAddr = `${bindAddr}:${port}`;
@@ -872,12 +866,12 @@ function App() {
       let connectionConfirmed = false;
       let isReady = false;
 
-      // Optimized regex pattern - compiled once (regex literal / karışmasın diye string + new RegExp)
+      // Optimized regex pattern - compiled once (string + new RegExp so regex literal / does not conflict)
       const SKIP_PATTERN = new RegExp(
         "\\[(?:PROXY|DNS|HTTPS|CACHE|app)]|method:\\s*CONNECT|cache (?:miss|hit)|resolving|routing|resolution took|new conn|client sent hello|shouldExploit|useSystemDns|fragmentation|conn established|writing chunked|caching \\d+ records|[a-f0-9]{8}-[a-f0-9]{8}|d88|Y88|88P|level=|ctrl \\+ c|listen_addr|dns_addr|github\\.com|spoofdpi|connection timeout|\\[::1\\]|ipv6|AAAA|no suitable address|network is unreachable|connectex.*\\[|telemetry\\.net|dns lookup failed",
         "i",
       );
-      // Bağlantı kesilirken / yeniden bağlanırken SpoofDPI tüm tünelleri kapatır; her biri "error handling request" / "wsarecv ... aborted" WRN basar - kullanıcı loguna taşıma
+      // While disconnecting/reconnecting SpoofDPI closes all tunnels; each logs WRN — do not forward to user log
       const isTunnelShutdownNoise = (l) =>
         /\[pxy\].*error handling request|unsuccessful tunnel|wsarecv|aborted by the software in your host machine|failed to read http request|malformed HTTP request|invalid method/i.test(
           l,
@@ -885,18 +879,18 @@ function App() {
 
       const handleOutput = async (line, type) => {
         if (!line || line.length === 0) return;
-        // PERF: trim'i ve toLowerCase'i sadece gerektiğinde yap
-        // İlk hızlı kontrol: prefix-based level filter
+        // PERF: trim and toLowerCase only when needed
+        // First quick check: prefix-based level filter
         const c0 = line.charCodeAt(0);
         const isLevelPrefix =
           (c0 === 68 || c0 === 100 || c0 === 73 || c0 === 105 || c0 === 87 || c0 === 119 || c0 === 69 || c0 === 101) &&
           /^(DBG|INF|WRN|ERR|DEBUG|INFO|WARN|ERROR)\b/i.test(line);
 
-        // Bypass sayaç motoru — her satırda çalışır ama regex'ten önce ucuz includes filter var
+        // Bypass counter engine — runs every line but cheap includes filter before regex
         const statsSnap = bypassTrackerRef.current?.ingest(line);
         if (statsSnap) flushBypassStats(statsSnap);
 
-        // Seviye prefix'li satırlar user-facing log'a yansımaz (info/debug/warn/error)
+        // Level-prefixed lines are not shown in user-facing log (info/debug/warn/error)
         if (isLevelPrefix) return;
 
         const trimmedLine = line.trim();
@@ -915,7 +909,7 @@ function App() {
         let friendlyKey = null;
         let friendlyParams = [];
 
-        // Port hatası (sadece gerçekten "in use" hatalarında tetikle)
+        // Port error (trigger only on real "in use" errors)
         const isPortInUse =
           (lowerLine.includes("bind") || lowerLine.includes("yuva adresi")) &&
           (lowerLine.includes("already in use") ||
@@ -953,11 +947,11 @@ function App() {
             i18nParams: friendlyParams,
           });
         } else {
-          // Friendly mapping yoksa, ham SpoofDPI çıktısını da göster ki hata detayları kaybolmasın
+          // If no friendly mapping, show raw SpoofDPI output so error details are not lost
           addLog(trimmedLine, type === "warn" ? "warn" : "info");
         }
 
-        // Wait for port to be actually ready (listener log geldikten sonra kısa bekle; SpoofDPI 1.2.1 bazen geç bind ediyor)
+        // Wait for port to be actually ready (brief wait after listener log; SpoofDPI 1.2.1 sometimes binds late)
         if (!connectionConfirmed && isReady) {
           connectionConfirmed = true;
           await new Promise((r) => setTimeout(r, 400));
@@ -967,7 +961,7 @@ function App() {
               i18nKey: "logPortRetryOpen",
               i18nParams: [port],
             });
-            // Sonraki portu dene: process'i kapat, Rust yeni port verecek, yeniden başlat
+            // Try next port: kill process, Rust assigns new port, restart
             if (portRetryCount < 19) {
               isRetrying.current = true;
               if (childProcess.current) {
@@ -1001,7 +995,7 @@ function App() {
             return;
           }
 
-          // ✅ Başarılı bağlantı - retry mekanizmasını sıfırla
+          // ✅ Successful connection — reset retry mechanism
           retryCount.current = 0;
           userIntentDisconnect.current = false;
 
@@ -1048,8 +1042,8 @@ function App() {
           }
 
           setTimeout(() => {
-            // Smart Retry: Port increment yerine Rust'ın yeni port bulmasına güveniyoruz
-            // Ama yine de recursion için count artırıyoruz
+            // Smart Retry: trust Rust to find a new port instead of incrementing
+            // Still increment count for recursion
             startEngine(0, portRetryCount + 1);
           }, 1000);
         }
@@ -1059,9 +1053,9 @@ function App() {
         if (!isRetrying.current) {
           const isUnexpectedClose = data.code !== 0 && data.code !== null;
 
-          // ✅ ÖNCE user intent kontrol et
+          // ✅ Check user intent FIRST
           if (userIntentDisconnect.current) {
-            // Kullanıcı kasıtlı kapattı - normal mesaj göster
+            // User intentionally closed — show normal message
             addLog(t.logEngineStoppedGrace, "info", {
               i18nKey: "logEngineStoppedGrace",
             });
@@ -1080,13 +1074,13 @@ function App() {
             // Reset flags
             retryCount.current = 0;
             userIntentDisconnect.current = false;
-            return; // Erken çık, retry yapma
+            return; // Exit early, do not retry
           }
 
-          // Kullanıcı kasıtlı kapatmadı - beklenmedik kapanma
+          // User did not intentionally close — unexpected shutdown
           if (isUnexpectedClose) {
-            const exitCode = data.code ?? "Bilinmiyor (Zorla Kapatıldı)";
-            const warnMsg = `⚠️ ${t.logEngineStopped(exitCode)}`;
+            const exitCode = data.code ?? "Unknown (Force Closed)";
+            const warnMsg = t.logEngineStopped(exitCode);
             addLog(warnMsg, "warn", {
               i18nKey: "logEngineStopped",
               i18nParams: [exitCode],
@@ -1097,7 +1091,7 @@ function App() {
             });
           }
 
-          // ✅ childProcess null yapılmadan önce backup al
+          // ✅ Backup before setting childProcess null
           const hadActiveProcess = childProcess.current !== null;
 
           setIsConnected(false);
@@ -1113,20 +1107,20 @@ function App() {
               console.error(err);
             }
           })();
-          updateTrayTooltip("disconnected"); // ✅ Bağlantı koptu (geçici)
+          updateTrayTooltip("disconnected"); // ✅ Connection lost (temporary)
 
-          // ✅ Otomatik yeniden bağlanma kontrol
+          // ✅ Automatic reconnect kontrol
           const autoReconnectEnabled =
-            configRef.current.autoReconnect !== false; // undefined veya true ise açık
+            configRef.current.autoReconnect !== false; // enabled when undefined or true
 
           const shouldReconnect =
-            autoReconnectEnabled && // Ayarda açık mı?
-            !userIntentDisconnect.current && // Kullanıcı kasıtlı kapatmadı mı?
-            !fatalErrorRef.current && // Ölümcül hata yok mu?
-            hadActiveProcess; // Process çalışıyor muydu?
+            autoReconnectEnabled && // Enabled in settings?
+            !userIntentDisconnect.current && // User did not intentionally disconnect?
+            !fatalErrorRef.current && // No fatal error?
+            hadActiveProcess; // Was process running?
 
           if (shouldReconnect) {
-            addLog(`🔄 ${t.logAutoReconnect}`, "info", {
+            addLog(t.logAutoReconnect, "info", {
               i18nKey: "logAutoReconnect",
             });
             notifyUser("DPIReaper", t.logAutoReconnect, "disconnect");
@@ -1142,7 +1136,7 @@ function App() {
       const child = await command.spawn();
       childProcess.current = child;
       invoke("save_sidecar_pid", { pid: child.pid }).catch(console.warn);
-      isStartingEngine.current = false; // Mülkiyeti childProcess'e devret
+      isStartingEngine.current = false; // Hand ownership to childProcess
 
       // Failsafe timeout
       setTimeout(async () => {
@@ -1151,10 +1145,10 @@ function App() {
           !connectionConfirmed &&
           !isRetrying.current
         ) {
-          // P1-FIX: Proxy'yi Windows'a yazmadan önce uygulamanın gerçekten port dinlediğini TCP ile doğrula
+          // P1-FIX: Before writing proxy to Windows, verify app listens on port via TCP
           const portReady = await waitForPort(port, 3);
           if (!portReady) {
-            addLog(t.logFailsafePortClosed || "Beklenmeyen Hata: Proxy başlatılamadı", "error");
+            addLog(t.logFailsafePortClosed || "Unexpected error: Proxy failed to start", "error");
             if (childProcess.current) {
               childProcess.current.kill().catch(() => {});
               childProcess.current = null;
@@ -1176,7 +1170,7 @@ function App() {
             });
           }
 
-          // ✅ Başarılı bağlantı - retry mekanizmasını sıfırla
+          // ✅ Successful connection — reset retry mechanism
           retryCount.current = 0;
           userIntentDisconnect.current = false;
 
@@ -1184,7 +1178,7 @@ function App() {
           setIsProcessing(false);
           addLog(t.logConnected, "info", { i18nKey: "logConnected" });
           notifyUser("DPIReaper", t.logConnected, "connect");
-          updateTrayTooltip("connected"); // ✅ Auto-connect başarılı
+          updateTrayTooltip("connected"); // ✅ Auto-connect succeeded
           if (configRef.current.lanSharing) {
             try {
               const pacResult = await invoke("start_pac_server", { proxyPort: port });
@@ -1206,7 +1200,7 @@ function App() {
         i18nParams: [e],
       });
 
-      // B5: Spawn hatasını kategorize et — kullanıcıya doğru aksiyon mesajı ver
+      // B5: Categorize spawn error — show correct action message to user
       const errStr = String(e).toLowerCase();
       let categoryKey = null;
       if (errStr.includes("address already in use") || errStr.includes("only one usage") || errStr.includes("port")) {
@@ -1219,7 +1213,7 @@ function App() {
         categoryKey = "logAntivirusWarning";
       }
       if (categoryKey) {
-        addLog("⚠️ " + (t[categoryKey] || ""), "warn", { i18nKey: categoryKey });
+        addLog(t[categoryKey] || "", "warn", { i18nKey: categoryKey });
       }
       setIsConnected(false);
       setIsProcessing(false);
@@ -1232,23 +1226,23 @@ function App() {
   };
 
   const toggleConnection = async () => {
-    // ✅ FIX: isProcessing VEYA restart sırasında toggle'ı engelle (race condition fix)
+    // ✅ FIX: Block toggle during isProcessing OR restart (race condition fix)
     if (isProcessing || isRestartingDpi.current || isRestartingLan.current) return;
 
     if (isConnected) {
       if (configRef.current.requireConfirmation !== false) {
         const confirmed = await customConfirm(
           t.confirmDisconnectDesc ||
-            "Güvenli bağlantınızı sonlandırmak istediğinize emin misiniz?",
-          { title: t.confirmDisconnectTitle || "Bağlantıyı Kes" },
+            "Are you sure you want to end your secure connection?",
+          { title: t.confirmDisconnectTitle || "Disconnect" },
         );
         if (!confirmed) return;
       }
 
-      // ✅ Kullanıcı kasıtlı olarak bağlantıyı kesiyor
+      // ✅ User is intentionally disconnecting
       userIntentDisconnect.current = true;
 
-      // Retry timer varsa iptal et
+      // Cancel retry timer if set
       if (retryTimer.current) {
         clearTimeout(retryTimer.current);
         retryTimer.current = null;
@@ -1274,13 +1268,13 @@ function App() {
       await clearProxy();
       addLog(t.logServiceStopped, "success", { i18nKey: "logServiceStopped" });
 
-      // Eğer kapatma (shutdown) sırasındaysa, bildirim yollama.
+      // Do not send notification during shutdown.
       if (!isAppClosingRef.current) {
-        notifyUser("DPIReaper", t.notifDisconnectManual, "disconnect_manual"); // Özel notification event tipi
+        notifyUser("DPIReaper", t.notifDisconnectManual, "disconnect_manual"); // Custom notification event type
       }
 
       setIsProcessing(false);
-      updateTrayTooltip("disconnected"); // ✅ Manuel durdurma
+      updateTrayTooltip("disconnected"); // ✅ Manual stop
     } else {
       retryCount.current = 0;
       userIntentDisconnect.current = false;
@@ -1301,12 +1295,12 @@ function App() {
   };
 
   useEffect(() => {
-    // PERF: Sadece log paneli açıkken kaydırma yap — kapalıyken DOM erişimi gereksiz
+    // PERF: Scroll only when log panel open — DOM access wasteful when closed
     if (!showLogs) return;
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs, showLogs]);
 
-  // ✅ #4: useRef kullanarak stale closure önlenir (useState idi)
+  // ✅ #4: useRef prevents stale closure (was useState)
   const isAppClosingRef = useRef(false);
 
   const configRef = useRef(config);
@@ -1315,7 +1309,7 @@ function App() {
     configRef.current = config;
   }, [config]);
 
-  // ✅ "Her şeyin üzerinde tut" ayarı değişince pencereye uygula
+  // ✅ Apply always-on-top setting to window when it changes
   useEffect(() => {
     (async () => {
       try {
@@ -1327,7 +1321,7 @@ function App() {
     })();
   }, [config.alwaysOnTop]);
 
-  // ✅ LAN Sharing değişince bağlı bağlantıyı yeni ayarla yeniden başlat
+  // ✅ Restart active connection when LAN sharing changes
   const isRestartingLan = useRef(false);
   useEffect(() => {
     if (prevLanSharingRef.current === config.lanSharing) return;
@@ -1338,11 +1332,11 @@ function App() {
 
     addLog(t.logLanRestart, "warn", { i18nKey: "logLanRestart" });
 
-    // Kullanıcıya süreç boyunca "yeniden bağlanıyor" hissi ver
+    // Give user a "reconnecting" feel during the process
     setIsProcessing(true);
     updateTrayTooltip("connecting");
 
-    // Manuel restart: auto-reconnect karışmasın
+    // Manual restart: do not mix with auto-reconnect
     userIntentDisconnect.current = true;
     if (retryTimer.current) {
       clearTimeout(retryTimer.current);
@@ -1365,10 +1359,10 @@ function App() {
       isRestartingLan.current = false;
       setIsProcessing(true);
       startEngine(0);
-    }, 2500); // Portun serbest kalması için (SpoofDPI 1.2.1 / TIME_WAIT)
+    }, 2500); // Allow port to free (SpoofDPI 1.2.1 / TIME_WAIT)
   }, [config.lanSharing, isConnected]);
 
-  // ✅ P1-FIX: DPI modu, chunk size VEYA DNS değişince bağlı bağlantıyı otomatik yeniden başlat (Stale DNS önleme)
+  // ✅ P1-FIX: Auto-restart connection when DPI mode, chunk size OR DNS changes (prevent stale DNS)
   const isRestartingDpi = useRef(false);
   const [isApplyingSettings, setIsApplyingSettings] = useState(false);
   useEffect(() => {
@@ -1418,37 +1412,37 @@ function App() {
       setIsApplyingSettings(false);
       setIsProcessing(true);
       startEngine(0);
-    }, 2500); // Portun serbest kalması için (SpoofDPI 1.2.1 / TIME_WAIT)
+    }, 2500); // Allow port to free (SpoofDPI 1.2.1 / TIME_WAIT)
   }, [config.dpiMethod, config.httpsChunkSize, config.selectedDns, config.dnsMode, config.enableWinhttp, config.ipv4Only, isConnected]);
 
   useEffect(() => {
     // Initial cleanup on mount
     (async () => {
       try {
-        // P0-FIX-1: Crash/BSOD sonrası kalan proxy ayarlarını sentinel ile tespit edip temizle
+        // P0-FIX-1: Detect and clean leftover proxy settings after crash/BSOD via sentinel
         const wasDirty = await invoke("startup_proxy_cleanup").catch((e) => {
           console.warn("Startup proxy cleanup:", e);
           return false;
         });
         if (wasDirty) {
-          addLog("⚠️ Önceki oturum düzgün kapanmamış — proxy ayarları temizlendi", "warn", {
+          addLog(t.logDirtyShutdownRecovery, "warn", {
             i18nKey: "logDirtyShutdownRecovery",
           });
         }
 
-        // ✅ Sorun 4: Zombi süreçleri temizle (önceki çökme/force kill sonrası kalmış olabilir)
+        // ✅ Issue 4: clean zombie processes (may remain after crash/force kill)
         await invoke("kill_zombie_sidecar").catch((e) =>
-          console.log("Zombi temizleme:", e)
+          console.log("Zombie cleanup:", e)
         );
-        // ✅ Sorun 1: Proxy'yi temizle (çökme sonrası kalıntı)
+        // ✅ Issue 1: clear proxy (leftover after crash)
         await clearProxy(true);
         updateTrayTooltip("disconnected");
 
-        // Defender consent (sessiz auto-add kaldırıldı) — onboarding bittikten sonra
-        // ayrı useEffect aracılığıyla soru dialog'u açılır.
+        // Defender consent (silent auto-add removed) — after onboarding
+        // prompt dialog opens via separate useEffect.
 
-        // P1-FIX: Auto-Connect Race Condition çözümü (Temizlik adımları tamamlandıktan SONRA bağlan)
-        // ✅ İlk giriş overlay'ı açıksa auto-connect yapma — kullanıcı ISS seçsin önce
+        // P1-FIX: Auto-Connect race condition fix (connect AFTER cleanup steps complete)
+        // ✅ Skip auto-connect if first-run overlay open — let user pick ISP first
         const isFirstRun = !localStorage.getItem(LS_KEYS.firstRun);
         const adminOk = await invoke('check_admin').catch(() => false);
         if (configRef.current.autoConnect && adminOk && !childProcess.current && !isFirstRun) {
@@ -1466,7 +1460,7 @@ function App() {
       const unlisten = await win.onCloseRequested(async (event) => {
         event.preventDefault();
 
-        // ✅ handleExit zaten çıkış yapıyorsa — hemen kapat, tekrar modal gösterme
+        // ✅ If handleExit already exiting — close immediately, no modal again
         if (isExiting.current) {
           await getCurrentWindow().destroy();
           return;
@@ -1490,7 +1484,7 @@ function App() {
           const confirmed = await customConfirm(
             t.confirmExitDesc ||
               t.confirmExitDesc,
-            { title: t.confirmExitTitle || "Çıkış" },
+            { title: t.confirmExitTitle || "Exit" },
           );
           if (!confirmed) {
             isAppClosingRef.current = false;
@@ -1506,14 +1500,14 @@ function App() {
         setAppIsClosingState(true);
         flushPendingConfig();
 
-        // ✅ Timer'ı temizle
+        // ✅ Clear timer
         if (retryTimer.current) {
           clearTimeout(retryTimer.current);
           retryTimer.current = null;
         }
 
-        // ✅ Cleanup'ı 3 saniyelik bir timeout ile koru
-        // Windows, çıkış işlemi çok uzarsa "düzgün kapatılmadı" uyarısı gösterir
+        // ✅ Guard cleanup with 3s timeout
+        // Windows shows "did not shut down properly" if exit takes too long
         const cleanupPromise = (async () => {
           try {
             if (childProcess.current) {
@@ -1522,7 +1516,7 @@ function App() {
             }
             await clearProxy(true);
             
-            // ✅ Animasyonun görünmesi ve PAC grace period için bekle
+            // ✅ Wait for animation and PAC grace period
             await new Promise((resolve) => setTimeout(resolve, 500));
           } catch (e) {
             console.error("Cleanup failed:", e);
@@ -1554,7 +1548,7 @@ function App() {
         if (unlistenFn.unlistenTrayQuit) unlistenFn.unlistenTrayQuit();
       }
 
-      // ✅ Retry timer'ı temizle
+      // ✅ Clear retry timer
       if (retryTimer.current) {
         clearTimeout(retryTimer.current);
         retryTimer.current = null;
@@ -1587,33 +1581,33 @@ function App() {
   }, []);
 
   const handleExit = async () => {
-    // ✅ Zaten çıkış yapılıyorsa tekrar tetikleme
+    // ✅ Do not trigger again if already exiting
     if (isExiting.current) return;
 
     if (configRef.current.requireConfirmation !== false) {
       const confirmed = await customConfirm(
         t.confirmExitDesc ||
           t.confirmExitDesc,
-        { title: t.confirmExitTitle || "Çıkış" },
+        { title: t.confirmExitTitle || "Exit" },
       );
       if (!confirmed) return;
     }
 
-    // ✅ Flag'i set et — onCloseRequested'ın tekrar modal göstermesini engeller
+    // ✅ Set flag — prevents onCloseRequested from showing modal again
     isExiting.current = true;
     isAppClosingRef.current = true;
-    userIntentDisconnect.current = true; // Reconnect engelle
+    userIntentDisconnect.current = true; // Block reconnect
     setAppIsClosingState(true);
     flushPendingConfig();
     addLog(t.logShutdownStarting, "warn", { i18nKey: "logShutdownStarting" });
 
-    // ✅ Timer'ı temizle
+    // ✅ Clear timer
     if (retryTimer.current) {
       clearTimeout(retryTimer.current);
       retryTimer.current = null;
     }
 
-    // ✅ Cleanup'ı 3 saniyelik timeout ile koru — Windows "düzgün kapatılmadı" uyarısını önler
+    // ✅ Guard cleanup with 3s timeout — prevents Windows improper shutdown warning
     const cleanupPromise = (async () => {
       try {
         if (childProcess.current) {
@@ -1628,7 +1622,7 @@ function App() {
         } catch (_) {}
         await clearProxy(true);
         
-        // ✅ Animasyonun görünmesi ve PAC grace period için bekle
+        // ✅ Wait for animation and PAC grace period
         await new Promise((resolve) => setTimeout(resolve, 500));
       } catch (e) {
         console.error("Cleanup failed:", e);
@@ -1646,13 +1640,13 @@ function App() {
     }
   };
 
-  // Auto-connect on mount mantığı P1-FIX kapsamında main cleanup rutinine taşındı (Race Condition'ı önlemek için)
-  // P1-FIX: Ayarlardan manuel "İnterneti Onar" tetiklendiğinde senkronize olarak Sidecar'ı kapat ve state'i sıfırla
+  // Auto-connect on mount moved to main cleanup routine in P1-FIX (prevent race condition)
+  // P1-FIX: When manual Fix Internet triggered from settings, synchronously stop sidecar and reset state
   useEffect(() => {
     const handleForceDisconnect = async (e) => {
       console.log('[FORCE-DISCONNECT]', e.detail?.reason);
       
-      // Bağlıysa kes
+      // Disconnect if connected
       if (childProcess.current) {
         userIntentDisconnect.current = true;
         try {
@@ -1671,50 +1665,7 @@ function App() {
     return () => window.removeEventListener('dpireaper-force-disconnect', handleForceDisconnect);
   }, []);
 
-  // DPI & Layout Scaling Fix — B12: rAF debounce ile her resize event'inde DOM yazımı önlenir
-  useEffect(() => {
-    let rafId = 0;
-    const applyScale = () => {
-      rafId = 0;
-      const DESIGN_WIDTH = APP.designWidth;
-      const DESIGN_HEIGHT = APP.designHeight;
-      const currentWidth = window.innerWidth;
-      const currentHeight = window.innerHeight;
-      const scaleX = currentWidth / DESIGN_WIDTH;
-      const scaleY = currentHeight / DESIGN_HEIGHT;
-      const scale = Math.min(scaleX, scaleY);
-
-      if (scale < 0.99) {
-        document.body.style.transform = `scale(${scale})`;
-        document.body.style.transformOrigin = "top left";
-        document.body.style.width = `${100 / scale}%`;
-        document.body.style.height = `${100 / scale}%`;
-      } else {
-        document.body.style.transform = "";
-        document.body.style.transformOrigin = "";
-        document.body.style.width = "";
-        document.body.style.height = "";
-      }
-    };
-    const handleResize = () => {
-      if (rafId) return;
-      rafId = requestAnimationFrame(applyScale);
-    };
-
-    window.addEventListener("resize", handleResize);
-    applyScale();
-    const t1 = setTimeout(applyScale, 100);
-    const t2 = setTimeout(applyScale, 500);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      if (rafId) cancelAnimationFrame(rafId);
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, []);
-
-  // B6: Modal'larda ESC ile kapatma
+  // B6: ESC closes modals
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== 'Escape') return;
@@ -1767,8 +1718,95 @@ function App() {
     };
   }, []);
 
+  const overlayActive = showSettings || showLogs;
+
+  useEffect(() => {
+    const wasOverlay = overlayActiveRef.current;
+    overlayActiveRef.current = overlayActive;
+    if (wasOverlay && !overlayActive) {
+      if (logQueueRef.current.length > 0 && !logFlushRafRef.current) {
+        logFlushRafRef.current = requestAnimationFrame(flushLogQueue);
+      }
+      if (bypassPendingRef.current) {
+        setBypassStats(bypassPendingRef.current);
+        bypassPendingRef.current = null;
+      }
+    }
+  }, [overlayActive]);
+
+  const stableRequestDefenderExclusion = useCallback(async () => {
+    try {
+      await invoke('add_defender_exclusions');
+      localStorage.setItem(LS_KEYS.defenderExclusionDecision, 'added');
+      setDefenderDecision('added');
+      return true;
+    } catch (e) {
+      addLog(t.logDefenderExclusionFailed, 'warn', { i18nKey: 'logDefenderExclusionFailed' });
+      return false;
+    }
+  }, [t.logDefenderExclusionFailed]);
+
+  const handleAutostartError = useCallback(() => {
+    addLog(t.autostartEnableFailed, 'warn', { i18nKey: 'autostartEnableFailed' });
+  }, [t.autostartEnableFailed]);
+
+  const openSettings = useCallback(() => {
+    settingsSnapRef.current = configRef.current;
+    setShowSettings(true);
+  }, []);
+
+  const handleSettingsClose = useCallback((savedConfig) => {
+    setConfig(savedConfig);
+    try {
+      localStorage.setItem(LS_KEYS.config, JSON.stringify(savedConfig));
+    } catch (e) {
+      console.error('Config write failed:', e);
+    }
+    setShowSettings(false);
+  }, []);
+
+  // PERF: Settings only: mount Settings tree — not app-container/Framer Motion
+  if (!appIsClosingState && showSettings && !showLogs && settingsSnapRef.current) {
+    return (
+      <div className="settings-standalone-root">
+        <div className="window-drag" data-tauri-drag-region />
+        <Settings
+          initialConfig={settingsSnapRef.current}
+          onClose={handleSettingsClose}
+          ispDetection={ispDetection}
+          isConnected={isConnected}
+          currentPort={currentPort}
+          defenderDecision={defenderDecision}
+          requestDefenderExclusion={stableRequestDefenderExclusion}
+          onAutostartError={handleAutostartError}
+        />
+        <UpdateAvailableModal
+          open={showUpdateModal && !!updateInfo}
+          t={t}
+          version={updateInfo?.version}
+          onDownload={() => {
+            if (updateInfo?.url) openShell(updateInfo.url);
+            setShowUpdateModal(false);
+          }}
+          onLater={() => {
+            if (updateInfo?.version) {
+              localStorage.setItem(LS_KEYS.dismissedUpdateVersion, updateInfo.version);
+            }
+            setShowUpdateModal(false);
+          }}
+        />
+        <DefenderConsentModal
+          open={showDefenderConsent}
+          t={t}
+          onAccept={handleDefenderConsentAccept}
+          onDecline={handleDefenderConsentDecline}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className={`app-container fade-in${isConnected ? ' is-connected' : ''}`}>
+    <div className={`app-container fade-in${isConnected ? ' is-connected' : ''}${overlayActive ? ' overlay-open' : ''}`}>
       <AnimatePresence>
         {appIsClosingState && (
           <motion.div
@@ -1808,7 +1846,7 @@ function App() {
                 style={{ animation: "pulse 2s infinite ease-in-out" }}
               />
               <h1 style={{ fontSize: "1.3rem", fontWeight: "600", color: "#fff", marginBottom: "0.5rem" }}>
-                {t.confirmExitTitle || "DPIReaper Kapatılıyor"}
+                {t.confirmExitTitle || "Closing DPIReaper"}
               </h1>
               <p style={{ color: "#a1a1aa", fontSize: "0.95rem" }}>
                 <AnimatePresence mode="wait">
@@ -1821,8 +1859,8 @@ function App() {
                     style={{ display: "inline-block" }}
                   >
                     {closingStep === 0 
-                      ? (t.logShutdownStarting || "Güvenli bağlantı sonlandırılıyor").replace(/\.+$/, "")
-                      : "Uygulama kapatılıyor"}
+                      ? (t.logShutdownStarting || "Ending secure connection").replace(/\.+$/, "")
+                      : "Closing application"}
                     <span style={{ display: "inline-block", width: "16px", textAlign: "left" }}>
                       {closingDots}
                     </span>
@@ -1833,6 +1871,8 @@ function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <div className="window-drag" data-tauri-drag-region />
 
       <AnimatePresence>
         {!isAdmin && !import.meta.env.DEV && !appIsClosingState && (
@@ -2022,9 +2062,11 @@ function App() {
         )}
       </AnimatePresence>
 
-      {/* İlk Açılış — 3-Adımlı Onboarding (C6) */}
+      {!overlayActive && (
+        <>
+      {/* First launch — multi-step onboarding (C6) */}
       <AnimatePresence>
-        {isAdmin && showFirstRunISS && !showSettings && (
+        {isAdmin && showFirstRunISS && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -2053,7 +2095,7 @@ function App() {
                 style={{ alignSelf: "center" }}
               />
 
-              {/* Adım göstergesi — 4 adım (0=dil, 1=ne işe yarar, 2=profil, 3=LAN) */}
+              {/* Step indicator — 4 steps (0=language, 1=what it does, 2=profile, 3=LAN) */}
               <div style={{ display: "flex", gap: 6, justifyContent: "center", margin: "0.5rem 0 1rem" }}>
                 {[0, 1, 2, 3].map((i) => (
                   <span
@@ -2191,9 +2233,6 @@ function App() {
         )}
       </AnimatePresence>
 
-      {/* Drag region — pencere üst boşluğu, içeriksiz */}
-      <div className="window-drag" data-tauri-drag-region />
-
       {/* Offline Alert */}
       <AnimatePresence>
         {!isOnline && (
@@ -2214,7 +2253,6 @@ function App() {
       {/* Main Content */}
       <main className="main-content">
         <div className="shield-wrapper">
-          {isConnected && !isProcessing && <div className="shield-wave" aria-hidden="true" />}
           <div
             className={`shield-circle ${isConnected ? "connected" : isProcessing ? "processing" : ""}`}
           >
@@ -2248,7 +2286,7 @@ function App() {
             const tier = detectProfileTier(config);
             const tierLabel = tier
               ? (t[`profile${tier.charAt(0).toUpperCase()}${tier.slice(1)}Name`] || tier)
-              : (t.profileCustomLabel || 'Özel');
+              : (t.profileCustomLabel || 'Custom');
             const dnsLabel = config.selectedDns && config.selectedDns !== 'system'
               ? config.selectedDns.toUpperCase()
               : null;
@@ -2277,7 +2315,7 @@ function App() {
                       </>
                     )}
                   </div>
-                  {/* Health indicator — aynı satırda, sağda */}
+                  {/* Health indicator — same row, right side */}
                   {healthStatus && (
                     <div className={`health-indicator ${healthStatus.ok ? 'is-ok' : 'is-fail'}`}>
                       <span className="health-indicator-dot" />
@@ -2298,7 +2336,7 @@ function App() {
         </AnimatePresence>
       </main>
 
-      {/* Sağ üst: bağlan (LAN) + bağış */}
+      {/* Top-right: connect (LAN) + donate */}
       <div className="main-corner-bar">
         <AnimatePresence>
           {config.lanSharing && isConnected && (
@@ -2360,7 +2398,7 @@ function App() {
       <nav className="bottom-nav" aria-label={t.navSettings + " / " + t.navLogs}>
         <button
           className="nav-btn nav-btn--icon"
-          onClick={() => setShowSettings(true)}
+          onClick={openSettings}
           aria-label={t.navSettings}
           title={t.navSettings}
         >
@@ -2376,8 +2414,10 @@ function App() {
           <ScrollText size={20} strokeWidth={2} />
         </button>
       </nav>
+        </>
+      )}
 
-      {showLogs && (
+      {!appIsClosingState && overlayActive && showLogs && (
         <div className="logs-overlay">
           <div className="logs-header">
             <h3 className="logs-title-text">{t.logsTitle}</h3>
@@ -2406,8 +2446,8 @@ function App() {
                 type="button"
                 className="icon-btn"
                 onClick={() => setShowLogs(false)}
-                aria-label="Kapat"
-                title="Kapat"
+                aria-label="Close"
+                title="Close"
               >
                 <X size={16} />
               </button>
@@ -2477,7 +2517,7 @@ function App() {
         </div>
       )}
 
-      {/* Cihaz Bağla — sade QR modal */}
+      {/* Connect device — simple QR modal */}
       <AnimatePresence>
         {showConnectionModal && (
           <motion.div
@@ -2500,8 +2540,8 @@ function App() {
                   type="button"
                   className="icon-btn"
                   onClick={() => setShowConnectionModal(false)}
-                  aria-label="Kapat"
-                  title="Kapat"
+                  aria-label="Close"
+                  title="Close"
                 >
                   <X size={16} />
                 </button>
@@ -2634,7 +2674,7 @@ function App() {
                       e.currentTarget.style.color = "#cbd5e1";
                     }}
                   >
-                    {t.btnNo || "İptal"}
+                    {t.btnNo || "Cancel"}
                   </button>
                   <button
                     autoFocus
@@ -2666,7 +2706,7 @@ function App() {
                         "0 4px 14px rgba(239, 68, 68, 0.3)";
                     }}
                   >
-                    {t.btnYes || "Onayla"}
+                    {t.btnYes || "Confirm"}
                   </button>
                 </div>
               </div>
@@ -2674,22 +2714,6 @@ function App() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {showSettings && (
-        <Settings
-          onBack={() => setShowSettings(false)}
-          config={config}
-          updateConfig={updateConfig}
-          dnsLatencies={dnsLatencies}
-          setDnsLatencies={setDnsLatencies}
-          ispDetection={ispDetection}
-          isConnected={isConnected}
-          currentPort={currentPort}
-          defenderDecision={defenderDecision}
-          requestDefenderExclusion={requestDefenderExclusion}
-          onAutostartError={(msg) => addLog(msg, 'warn', { i18nKey: 'autostartEnableFailed' })}
-        />
-      )}
 
       <UpdateAvailableModal
         open={showUpdateModal && !!updateInfo}

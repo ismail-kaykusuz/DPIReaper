@@ -1,6 +1,6 @@
 import React from 'react';
 
-/** Kurumsal toggle — kırmızı vurguda aktif. */
+/** Corporate toggle — active with red accent. */
 const Toggle = ({ checked, onChange, label }) => (
   <div
     role="switch"

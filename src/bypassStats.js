@@ -1,14 +1,14 @@
-/** Sidecar log satırlarından canlı bypass aktivitesi (kayan pencere).
+/** Live bypass activity from sidecar log lines (sliding window).
  *
- * Sayaç (connections / bypassEvents) tasarımdan kaldırıldı — kullanıcıya
- * yalnız bir görselleştirme çubuğu (buckets) sunuluyor. Bir satır ne kadar
- * "anlamlı" olursa olsun, sayma yerine sadece grafiğe yansır.
+ * Counter (connections / bypassEvents) removed from design — user gets
+ * only a visualization bar (buckets). No matter how
+ * "meaningful" a line is, it reflects on the graph instead of counting.
  */
 
 const NOISE_CHARS = new Set([0x20, 0x09]);
 
-// Çok pahalı regex yok — sadece şu kelimelerden biri geçen log satırlarını
-// "aktivite" olarak say. Saniye başına çok az ekstra iş çıkar.
+// No expensive regex — only log lines containing one of these words
+// count as "activity". Very little extra work per second.
 const ACTIVITY_HINTS = [
   'dial', 'tunnel', 'handled', 'connection',
   'forward', 'served', 'host', 'resolved',
@@ -59,7 +59,7 @@ export function createBypassStatsTracker(windowSize = 48) {
     const l = String(line || '');
     if (l.length < 4) return null;
 
-    // ASCII art / sidecar banner satırlarını at
+    // Skip ASCII art / sidecar banner lines
     const c0 = l.charCodeAt(0);
     if (NOISE_CHARS.has(c0)) {
       if (l.indexOf('888') !== -1 || l.indexOf('d88') !== -1) return null;

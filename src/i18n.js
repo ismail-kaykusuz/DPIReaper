@@ -1,16 +1,16 @@
 // ============================================================
-// DPIReaper — i18n yönlendirici
+// DPIReaper — i18n router
 // ============================================================
 //
-// Stil rehberi (her dilde aynı):
-//   • Section / Tab başlıkları    → ALL CAPS         (örn. "CONNECTION")
-//   • Setting / Buton ad ı         → Title Case        (örn. "Auto Connect")
-//   • Açıklama / Log mesajı       → Sentence case
-//   • Trail dots                   → "..." (üç nokta, tek karakter "…" değil)
+// Style guide (same in every language):
+//   • Section / Tab titles    → ALL CAPS         (e.g. "CONNECTION")
+//   • Setting / Button name         → Title Case        (e.g. "Auto Connect")
+//   • Description / Log message       → Sentence case
+//   • Trail dots                   → "..." (three dots, not single character "…")
 //
-// Çoklu dil (12 dil): TR + EN tam (log dahil). Diğer 10 dilde UI metinleri
-// tam; log mesajları gibi nadir görünen kayıtlar için EN'den fallback
-// otomatik gelir (Proxy mantığı).
+// Multilingual (12 langs): TR + EN complete (logs included). Other 10 langs have UI strings
+// complete; rare entries like log messages fall back to EN
+// automatically (Proxy logic).
 // ============================================================
 
 import tr from './locales/tr';
@@ -29,8 +29,8 @@ import ko from './locales/ko';
 const ALL = { tr, en, de, fr, es, it, ru, ar, zh, ja, pt, ko };
 
 /**
- * Verilen dil için sözlük döndürür. Anahtar eksikse otomatik olarak EN'e
- * (ve nihayetinde TR'ye) düşer — UI'da hiçbir string boş kalmaz.
+ * Returns dictionary for given language. Missing keys fall back to EN
+ * (and ultimately TR) — no empty strings in UI.
  */
 export const getTranslations = (lang = 'en') => {
   const base = ALL[lang] || ALL.en;
@@ -44,13 +44,13 @@ export const getTranslations = (lang = 'en') => {
   });
 };
 
-/** Sistem dilini otomatik tespit et (ilk açılışta default için). */
+/** Auto-detect system language (default on first launch). */
 export function detectSystemLang() {
   try {
     const nav = (navigator.language || 'en').toLowerCase();
     const short = nav.split('-')[0];
     if (ALL[short]) return short;
-    // zh-CN / zh-TW vb. için zh'ye düşür
+    // map zh-CN / zh-TW etc. to zh
     if (nav.startsWith('zh')) return 'zh';
   } catch (_) { /* sessizce yut */ }
   return 'en';

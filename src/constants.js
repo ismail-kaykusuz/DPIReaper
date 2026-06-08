@@ -1,5 +1,5 @@
 // ============================================================
-// DPIReaper — Merkezi Sabitler
+// DPIReaper — Central Constants
 // ============================================================
 
 export const URLS = {
@@ -25,11 +25,11 @@ export const DOH_MAP = {
   opendns: "https://208.67.222.222/dns-query",
 };
 
-const APP_VERSION = "1.0.7";
+const APP_VERSION = "1.0.8";
 
 export const APP = {
   name: "DPIReaper",
-  // B16: Cache-bust ile yeni sürümde Tauri WebView eski logoyu cache'lemesin
+  // B16: Cache-bust so Tauri WebView does not cache old logo on new version
   logo: `/dpireaper-logo.png?v=${APP_VERSION}`,
   version: APP_VERSION,
   designWidth: 380,
@@ -43,12 +43,12 @@ export const APP = {
 export const LS_KEYS = {
   config: "dpireaper_config",
   firstRun: "dpireaper_first_run_done",
-  // Defender consent: 'added' | 'declined' | null (henüz sorulmadı)
+  // Defender consent: 'added' | 'declined' | null (not asked yet)
   defenderExclusionDecision: "dpireaper_defender_exclusion_decision",
   ispCache: "dpireaper_isp_cache",
   onboardingDone: "dpireaper_onboarding_done",
   lang: "dpireaper_lang",
-  /** Kullanıcının "Sonra" dediği sürüm — aynı sürüm için tekrar gösterme */
+  /** User dismissed this update version — do not prompt again */
   dismissedUpdateVersion: "dpireaper_dismissed_update_version",
 };
 

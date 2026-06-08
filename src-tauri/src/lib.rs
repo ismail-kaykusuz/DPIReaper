@@ -1643,9 +1643,26 @@ fn apply_custom_bypass(domains: Vec<String>, proxy_port: u16) -> Result<(), Stri
     Ok(())
 }
 
+// ── WebView2 runtime flags ───────────────────────────────────────────
+
+#[cfg(windows)]
+fn apply_webview2_gpu_env_from_prefs() {
+    if std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").is_ok() {
+        return;
+    }
+    // Keep wry default features. Do not set --disable-gpu-compositing (doubles CPU use).
+    std::env::set_var(
+        "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+        "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection",
+    );
+}
+
+#[cfg(not(windows))]
+fn apply_webview2_gpu_env_from_prefs() {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Çalışma dizinini exe klasörüne al — Run registry ile boot'ta CWD System32 olabilir.
+    // Set CWD to exe directory — autostart via Run key may start with CWD System32.
     if let Ok(exe) = std::env::current_exe() {
         if let Some(parent) = exe.parent() {
             let _ = std::env::set_current_dir(parent);
@@ -1654,6 +1671,8 @@ pub fn run() {
 
     #[cfg(windows)]
     windows_autostart::heal_on_startup();
+
+    apply_webview2_gpu_env_from_prefs();
 
     // P0-FIX: Single-instance enforcement — aynı anda sadece bir DPIReaper çalışabilir
     #[cfg(target_os = "windows")]
@@ -1839,7 +1858,7 @@ pub fn run() {
             check_proxy_health,
             list_network_interfaces,
             repair_internet_extended,
-            apply_custom_bypass
+            apply_custom_bypass,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

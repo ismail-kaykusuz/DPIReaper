@@ -2,11 +2,11 @@ import React, { useMemo } from 'react';
 import { Activity } from 'lucide-react';
 
 /**
- * Ana ekranda sidecar'dan gelen aktiviteyi gösteren mini çizgi grafik.
+ * Mini line graph showing sidecar activity on main screen.
  *
- * PERF: React.memo ile sarılmış — yalnızca `stats` referansı değişince yeniden
- * render olur. App.jsx tarafında flushBypassStats 250ms throttle ile çağrılır,
- * yani saniyede max 4 render.
+ * PERF: wrapped in React.memo — re-renders only when `stats` reference changes
+ * App.jsx calls flushBypassStats with 250ms throttle,
+ * so at most 4 renders per second.
  */
 function BypassGraph({ stats, t, visible = true }) {
   const { path, areaPath, isLive } = useMemo(() => {

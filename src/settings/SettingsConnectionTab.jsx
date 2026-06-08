@@ -1,10 +1,9 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCw, Activity, Sparkles, Smartphone } from 'lucide-react';
 import ConnectionProfilePicker from './ConnectionProfilePicker';
 import Toggle from './Toggle';
 
-// DNS sağlayıcı görsel kimliği (lokal SVG yerine renkli yuvarlak + baş harf).
+// DNS provider visual identity (colored circle + initial instead of local SVG).
 const DNS_BRANDS = {
   cloudflare: { color: '#f38020', short: 'CF' },
   adguard:    { color: '#68bc71', short: 'A' },
@@ -20,7 +19,7 @@ const pingClass = (ms) => {
   return 'dns-card-ping--slow';
 };
 
-/** Ayarlar → BAĞLANTI sekmesi: profil seçici + modern DNS kartları. */
+/** Settings → CONNECTION tab: profile picker + modern DNS cards. */
 const SettingsConnectionTab = ({
   config,
   updateConfig,
@@ -34,15 +33,8 @@ const SettingsConnectionTab = ({
   const isAutoMode = config.dnsMode === 'auto';
 
   return (
-    <motion.div
-      key="connection-tab"
-      initial={{ opacity: 0, x: -15 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 15 }}
-      transition={{ duration: 0.2, ease: 'easeInOut' }}
-      style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}
-    >
-      {/* Bağlantı profili */}
+    <div className="settings-tab-panel settings-tab-panel--connection">
+      {/* Connection profile */}
       <ConnectionProfilePicker
         config={config}
         updateConfig={updateConfig}
@@ -50,7 +42,7 @@ const SettingsConnectionTab = ({
         ispDetection={ispDetection}
       />
 
-      {/* DNS — modern kart listesi */}
+      {/* DNS — modern card list */}
       <div className="v2-section">
         <div className="dns-section-header">
           <span className="v2-section-title">{t.sectionDns}</span>
@@ -67,7 +59,7 @@ const SettingsConnectionTab = ({
         </div>
 
         <div className="dns-card-list">
-          {/* Otomatik Seçim kartı — her zaman üstte */}
+          {/* Auto Select card — always on top */}
           <div
             role="radio"
             tabIndex={0}
@@ -99,27 +91,19 @@ const SettingsConnectionTab = ({
             </div>
           </div>
 
-          {/* DNS sağlayıcıları */}
-          <AnimatePresence>
-            {sortedProviders.filter((p) => p.id !== 'system').map((p) => {
+          {/* DNS providers */}
+          {sortedProviders.filter((p) => p.id !== 'system').map((p) => {
               const isSelected = !isAutoMode && config.selectedDns === p.id;
               const brand = DNS_BRANDS[p.id] || { color: '#71717a', short: p.name?.[0] || '?' };
               const ms = latencies[p.id];
               return (
-                <motion.div
-                  layout
+                <div
                   key={p.id}
                   role="radio"
                   tabIndex={0}
                   aria-checked={isSelected}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{
-                    opacity: isAutoMode ? 0.55 : 1,
-                    y: 0,
-                  }}
-                  exit={{ opacity: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                   className={`dns-card ${isSelected ? 'is-selected' : ''} ${isAutoMode ? 'is-locked' : ''}`}
+                  style={{ opacity: isAutoMode ? 0.55 : 1 }}
                   onClick={() => {
                     if (isAutoMode) return;
                     updateConfig('selectedDns', p.id);
@@ -149,14 +133,13 @@ const SettingsConnectionTab = ({
                       {isSelected && <div className="dns-card-radio-dot" />}
                     </div>
                   )}
-                </motion.div>
+                </div>
               );
             })}
-          </AnimatePresence>
         </div>
       </div>
 
-      {/* Diğer Cihazları Bağla — LAN sharing toggle */}
+      {/* Connect other devices — LAN sharing toggle */}
       <div className="v2-section">
         <div className="v2-section-title">{t.sectionConnectOtherDevices}</div>
         <div className="v2-card">
@@ -174,8 +157,8 @@ const SettingsConnectionTab = ({
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
 
-export default SettingsConnectionTab;
+export default React.memo(SettingsConnectionTab);

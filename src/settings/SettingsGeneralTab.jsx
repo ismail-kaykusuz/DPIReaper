@@ -1,20 +1,11 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { Power, Zap, RotateCw, Pin, AlertTriangle, Bell, Eye, Check } from 'lucide-react';
 import Toggle from './Toggle';
 import LanguagePicker from '../overlays/LanguagePicker';
 
-/** Ayarlar → GENEL sekmesi (eski "Uygulama" + "Davranış" + bildirim türleri birleştirildi). */
+/** Settings → General tab (language, startup, notifications). */
 const SettingsGeneralTab = ({ config, updateConfig, t, lang, autostartEnabled, toggleAutostart }) => (
-  <motion.div
-    key="general-tab"
-    initial={{ opacity: 0, x: -15 }}
-    animate={{ opacity: 1, x: 0 }}
-    exit={{ opacity: 0, x: 15 }}
-    transition={{ duration: 0.2, ease: 'easeInOut' }}
-    style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
-  >
-    {/* 1) Dil — modern picker */}
+  <div className="settings-tab-panel">
     <div className="v2-section">
       <LanguagePicker
         value={lang}
@@ -23,11 +14,9 @@ const SettingsGeneralTab = ({ config, updateConfig, t, lang, autostartEnabled, t
       />
     </div>
 
-    {/* 2) Açılış davranışı */}
     <div className="v2-section">
       <div className="v2-section-title">{t.sectionGeneral}</div>
       <div className="v2-card">
-        {/* Açılışta başlat */}
         <div className="v2-item">
           <div className="v2-icon"><Power size={20} /></div>
           <div className="v2-item-text">
@@ -37,7 +26,7 @@ const SettingsGeneralTab = ({ config, updateConfig, t, lang, autostartEnabled, t
           <Toggle checked={autostartEnabled} onChange={toggleAutostart} label={t.autoStart} />
         </div>
 
-        {/* Sub: Gizli aç — sadece autostart açıkken */}
+        {/* Sub: start hidden — only when autostart enabled */}
         {autostartEnabled && (
           <>
             <div className="v2-divider" />
@@ -57,7 +46,7 @@ const SettingsGeneralTab = ({ config, updateConfig, t, lang, autostartEnabled, t
         )}
 
         <div className="v2-divider" />
-        {/* Açılışta bağlan */}
+        {/* Connect on launch */}
         <div className="v2-item">
           <div className="v2-icon"><Zap size={20} /></div>
           <div className="v2-item-text">
@@ -68,7 +57,7 @@ const SettingsGeneralTab = ({ config, updateConfig, t, lang, autostartEnabled, t
         </div>
 
         <div className="v2-divider" />
-        {/* Otomatik yeniden bağlan */}
+        {/* Auto reconnect */}
         <div className="v2-item">
           <div className="v2-icon"><RotateCw size={20} /></div>
           <div className="v2-item-text">
@@ -79,7 +68,7 @@ const SettingsGeneralTab = ({ config, updateConfig, t, lang, autostartEnabled, t
         </div>
 
         <div className="v2-divider" />
-        {/* Tepsiye küçült */}
+        {/* Minimize to tray */}
         <div className="v2-item">
           <div className="v2-icon"><Check size={20} /></div>
           <div className="v2-item-text">
@@ -90,7 +79,7 @@ const SettingsGeneralTab = ({ config, updateConfig, t, lang, autostartEnabled, t
         </div>
 
         <div className="v2-divider" />
-        {/* Üstte tut */}
+        {/* Always on top */}
         <div className="v2-item">
           <div className="v2-icon"><Pin size={20} /></div>
           <div className="v2-item-text">
@@ -105,7 +94,7 @@ const SettingsGeneralTab = ({ config, updateConfig, t, lang, autostartEnabled, t
         </div>
 
         <div className="v2-divider" />
-        {/* Onay iste */}
+        {/* Require confirmation */}
         <div className="v2-item">
           <div className="v2-icon"><AlertTriangle size={20} /></div>
           <div className="v2-item-text">
@@ -169,7 +158,7 @@ const SettingsGeneralTab = ({ config, updateConfig, t, lang, autostartEnabled, t
         )}
       </div>
     </div>
-  </motion.div>
+  </div>
 );
 
-export default SettingsGeneralTab;
+export default React.memo(SettingsGeneralTab);
