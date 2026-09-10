@@ -25,6 +25,16 @@ const SettingsGeneralTab = ({ config, updateConfig, t, lang, autostartEnabled, t
           </div>
           <Toggle checked={autostartEnabled} onChange={toggleAutostart} label={t.autoStart} />
         </div>
+        {!autostartEnabled && (
+          <p style={{
+            margin: '0 1rem 0.75rem',
+            fontSize: 'var(--font-caption, 0.72rem)',
+            color: 'var(--text-tertiary)',
+            lineHeight: 1.4,
+          }}>
+            {t.autostartProxyGuardHint}
+          </p>
+        )}
 
         {/* Sub: start hidden — only when autostart enabled */}
         {autostartEnabled && (

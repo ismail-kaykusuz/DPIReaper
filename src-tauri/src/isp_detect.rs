@@ -113,15 +113,26 @@ fn match_from_text(text: &str) -> Option<IspDetectionResult> {
 
 #[cfg(target_os = "windows")]
 fn collect_windows_hints() -> String {
+    use std::os::windows::process::CommandExt;
     use std::process::Command;
+
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
 
     let mut combined = String::new();
 
-    if let Ok(out) = Command::new("ipconfig").arg("/all").output() {
+    if let Ok(out) = Command::new("ipconfig")
+        .arg("/all")
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+    {
         combined.push_str(&String::from_utf8_lossy(&out.stdout));
     }
 
-    if let Ok(out) = Command::new("netsh").args(["interface", "show", "interface"]).output() {
+    if let Ok(out) = Command::new("netsh")
+        .args(["interface", "show", "interface"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+    {
         combined.push('\n');
         combined.push_str(&String::from_utf8_lossy(&out.stdout));
     }

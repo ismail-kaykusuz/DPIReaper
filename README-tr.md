@@ -222,6 +222,25 @@ Normal bağlantınıza geri dönmek için aynı düğmeye tekrar tıklayın — 
 
 ---
 
+## Sorun Giderme
+
+### Daha önce GoodbyeDPI / zapret / SplitWire kullandım, DPIReaper çalışmıyor
+
+1. **Ayarlar → Gelişmiş → Derin onarım** — otomatik tarama yapar; çakışan süreç, servis, port veya DNS kalıntılarını tam ekran listede gösterir.
+2. **Temizle ve kaldır** — proxy/WinHTTP sıfırlama, adaptör DNS’ini DHCP’ye alma, NRPT temizliği ve rakip süreç/servisleri durdurma (eski aracı kaldırmaz).
+3. **WinDivert sürücüsü** hâlâ yüklüyse eski aracı Windows’tan kaldırıp PC’yi yeniden başlatın.
+4. **Ağı onar** — yalnızca DPIReaper’ın bıraktığı proxy ayarlarını temizler.
+
+### PC açılınca uygulama kapalıyken internet gitmiyor
+
+Önceki oturumda bağlıyken proxy `127.0.0.1`’e kalmış olabilir. DPIReaper en az bir kez yönetici olarak bağlandıktan sonra **DPIReaperProxyGuard** görevi oturum açılışında ölü proxy’yi temizler. Yine de sorun sürerse uygulamayı açıp **Ağı onar**’a basın.
+
+### Her açılışta UAC çıkıyor
+
+İlk kez yönetici onayı verdikten sonra **DPIReaperLaunch** görevi sessiz yükseltme sağlar. Autostart için **Açılışta başlat** açık olmalı ve görev yönetici olarak oluşturulmuş olmalıdır.
+
+---
+
 ## Projeyi Destekle
 
 DPIReaper boş zamanda geliştirilir; ücretsiz, açık kaynak ve reklamsız kalmıştır. Uygulamada hiçbir özellik ödeme duvarının arkasında değildir — bu kademeler tamamen birer teşekkürdür. DPIReaper sayenize bir ISS borç gecesi yaşamadıysanız bir sonraki sürüme destek olabilirsiniz:

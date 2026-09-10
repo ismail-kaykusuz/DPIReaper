@@ -15,10 +15,15 @@ const SettingsAdvancedTab = ({
   t,
   fixStatus,
   handleFixInternet,
+  deepRepairStatus = 'idle',
+  deepRepairMessage = '',
+  repairModalOpen = false,
+  handleDeepRepair,
   isConnected = false,
   currentPort = 0,
   defenderDecision = null,
-  requestDefenderExclusion = async () => false,
+  requestDefenderExclusion = async () => ({ success: false }),
+  relaunchAsAdmin = async () => {},
   isActive = true,
 }) => {
   // C18: Network interfaces (read-only info)
@@ -28,6 +33,7 @@ const SettingsAdvancedTab = ({
   const customDomains = Array.isArray(config.customBypassDomains) ? config.customBypassDomains : [];
 
   const [defenderBusy, setDefenderBusy] = useState(false);
+  const [defenderFeedback, setDefenderFeedback] = useState(null);
 
   useEffect(() => {
     if (!isActive) return;
@@ -63,8 +69,21 @@ const SettingsAdvancedTab = ({
   const handleAddDefender = async () => {
     if (defenderBusy) return;
     setDefenderBusy(true);
+    setDefenderFeedback(null);
     try {
-      await requestDefenderExclusion();
+      const result = await requestDefenderExclusion();
+      if (result?.success) {
+        setDefenderFeedback(null);
+        return;
+      }
+      if (result?.reason === 'admin') {
+        setDefenderFeedback({ type: 'admin', message: t.defenderAdminRequired });
+        return;
+      }
+      setDefenderFeedback({
+        type: 'error',
+        message: result?.message || t.defenderAddFailedDesc,
+      });
     } finally {
       setDefenderBusy(false);
     }
@@ -104,6 +123,20 @@ const SettingsAdvancedTab = ({
                   {defenderBusy && <RotateCw size={14} className="spinning" />}
                   {defenderBusy ? t.defenderAddingBtn : t.defenderAddBtn}
                 </button>
+                {defenderFeedback && (
+                  <div className={`defender-feedback defender-feedback--${defenderFeedback.type}`}>
+                    <p>{defenderFeedback.message}</p>
+                    {defenderFeedback.type === 'admin' && (
+                      <button
+                        type="button"
+                        className="defender-relaunch-btn"
+                        onClick={() => relaunchAsAdmin()}
+                      >
+                        {t.adminRelaunch}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -166,6 +199,41 @@ const SettingsAdvancedTab = ({
       <div className="v2-section">
         <div className="v2-section-title">{t.sectionTroubleshoot}</div>
         <div className="v2-card">
+          <div
+            className="v2-item hover-effect"
+            onClick={handleDeepRepair}
+            style={{ cursor: repairModalOpen ? 'default' : 'pointer' }}
+          >
+            <div className={`v2-icon ${deepRepairStatus !== 'idle' || repairModalOpen ? 'accent' : ''}`}>
+              <ShieldCheck size={20} className={repairModalOpen ? 'spinning' : ''} />
+            </div>
+            <div className="v2-item-text">
+              <h3>
+                {repairModalOpen ? t.conflictScanning
+                  : deepRepairStatus === 'done' ? t.deepRepairDone
+                  : deepRepairStatus === 'error' ? t.deepRepairError
+                  : t.deepRepairTitle}
+              </h3>
+              <p>
+                {repairModalOpen ? t.deepRepairScanDesc
+                  : deepRepairStatus === 'done'
+                    ? (deepRepairMessage || t.deepRepairDoneDesc)
+                    : deepRepairStatus === 'error'
+                      ? (deepRepairMessage || t.deepRepairErrorDesc)
+                      : t.deepRepairDesc}
+              </p>
+            </div>
+            <div style={{ padding: '0 0.5rem', color: 'var(--text-secondary)' }}>
+              {repairModalOpen && <RotateCw size={20} className="spinning" />}
+              {!repairModalOpen && deepRepairStatus === 'done' && (
+                <Check size={20} style={{ color: 'var(--accent-green)' }} />
+              )}
+              {!repairModalOpen && deepRepairStatus === 'error' && (
+                <AlertTriangle size={20} style={{ color: 'var(--accent)' }} />
+              )}
+            </div>
+          </div>
+          <div className="v2-divider" />
           <div
             className="v2-item hover-effect"
             onClick={handleFixInternet}

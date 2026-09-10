@@ -7,6 +7,7 @@ import SettingsGeneralTab from './settings/SettingsGeneralTab';
 import SettingsConnectionTab from './settings/SettingsConnectionTab';
 import SettingsAdvancedTab from './settings/SettingsAdvancedTab';
 import ConnectionProfilePicker from './settings/ConnectionProfilePicker';
+import ConflictRepairModal from './overlays/ConflictRepairModal';
 import './App.css';
 
 export { ConnectionProfilePicker };
@@ -53,7 +54,8 @@ const Settings = ({
   isConnected = false,
   currentPort = 0,
   defenderDecision = null,
-  requestDefenderExclusion = async () => false,
+  requestDefenderExclusion = async () => ({ success: false }),
+  relaunchAsAdmin = async () => {},
   onAutostartError = null,
 }) => {
   const [localConfig, setLocalConfig] = useState(initialConfig);
@@ -68,6 +70,9 @@ const Settings = ({
 
   const [autostartEnabled, setAutostartEnabled] = useState(false);
   const [fixStatus, setFixStatus] = useState('idle');
+  const [deepRepairStatus, setDeepRepairStatus] = useState('idle');
+  const [deepRepairMessage, setDeepRepairMessage] = useState('');
+  const [repairModalOpen, setRepairModalOpen] = useState(false);
 
   const lang = localConfig.language || 'tr';
   const t = useMemo(() => getTranslations(lang), [lang]);
@@ -204,6 +209,31 @@ const Settings = ({
     }
   }, [fixStatus]);
 
+  const handleDeepRepair = useCallback(() => {
+    if (repairModalOpen) return;
+    setDeepRepairMessage('');
+    setRepairModalOpen(true);
+  }, [repairModalOpen]);
+
+  const handleRepairModalClose = useCallback(() => {
+    setRepairModalOpen(false);
+  }, []);
+
+  const handleRepairComplete = useCallback((result) => {
+    if (!result) return;
+    if (result.status === 'cleaned') {
+      setDeepRepairStatus('done');
+      setDeepRepairMessage(result.summary || t.deepRepairDoneDesc);
+    } else if (result.status === 'error') {
+      setDeepRepairStatus('error');
+      setDeepRepairMessage(result.summary || t.deepRepairErrorDesc);
+    }
+    setTimeout(() => {
+      setDeepRepairStatus('idle');
+      setDeepRepairMessage('');
+    }, 5000);
+  }, [t.deepRepairDoneDesc, t.deepRepairErrorDesc]);
+
   const handleBack = useCallback(() => {
     if (configWriteTimerRef.current) {
       clearTimeout(configWriteTimerRef.current);
@@ -218,6 +248,13 @@ const Settings = ({
   }, [localConfig, onClose]);
 
   return (
+    <>
+    <ConflictRepairModal
+      open={repairModalOpen}
+      t={t}
+      onClose={handleRepairModalClose}
+      onComplete={handleRepairComplete}
+    />
     <div className="v2-settings-overlay">
       <div className="v2-settings-header">
         <button type="button" className="v2-back-btn" onClick={handleBack}>
@@ -258,10 +295,15 @@ const Settings = ({
             t={t}
             fixStatus={fixStatus}
             handleFixInternet={handleFixInternet}
+            deepRepairStatus={deepRepairStatus}
+            deepRepairMessage={deepRepairMessage}
+            repairModalOpen={repairModalOpen}
+            handleDeepRepair={handleDeepRepair}
             isConnected={isConnected}
             currentPort={currentPort}
             defenderDecision={defenderDecision}
             requestDefenderExclusion={requestDefenderExclusion}
+            relaunchAsAdmin={relaunchAsAdmin}
             isActive
           />
         )}
@@ -299,6 +341,7 @@ const Settings = ({
         </button>
       </nav>
     </div>
+    </>
   );
 };
 

@@ -8,6 +8,19 @@ $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";
 Write-Host "=== DPIReaper Dev ===" -ForegroundColor Cyan
 Write-Host "Proje: $Root"
 
+function Test-IsAdmin {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+if (-not (Test-IsAdmin)) {
+    Write-Host "Yonetici izni gerekiyor - UAC penceresi acilacak." -ForegroundColor Yellow
+    $elevArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
+    Start-Process -FilePath "powershell.exe" -Verb RunAs -ArgumentList $elevArgs -WorkingDirectory $Root
+    exit 0
+}
+
 $proxySidecar = Join-Path $Root "src-tauri\binaries\dpireaper-proxy-x86_64-pc-windows-msvc.exe"
 if (-not (Test-Path $proxySidecar)) {
     Write-Host "dpireaper-proxy eksik - derleniyor..." -ForegroundColor Yellow

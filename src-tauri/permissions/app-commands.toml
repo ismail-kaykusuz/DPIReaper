@@ -27,4 +27,8 @@ commands.allow = [
   "list_network_interfaces",
   "repair_internet_extended",
   "apply_custom_bypass",
+  "scan_dpi_conflicts",
+  "stop_dpi_conflicts",
+  "deep_repair_network",
+  "ensure_proxy_guard_installed",
 ]

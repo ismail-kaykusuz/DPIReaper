@@ -3,6 +3,7 @@
 
 #[cfg(windows)]
 mod imp {
+    use crate::proxy_guard::is_process_elevated;
     use std::fs::{self, File};
     use std::io::Write;
     use std::os::windows::process::CommandExt;
@@ -19,6 +20,7 @@ mod imp {
         r"Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers";
     const VALUE_NAME: &str = "DPIReaper";
     const TASK_NAME: &str = "DPIReaperAutostart";
+    pub const LAUNCH_TASK_NAME: &str = "DPIReaperLaunch";
     const LOGON_DELAY: &str = "PT45S";
 
     fn pref_path() -> Result<PathBuf, String> {
@@ -95,15 +97,40 @@ mod imp {
         }
     }
 
-    fn task_exists() -> bool {
+    fn task_exists(task_name: &str) -> bool {
         Command::new("schtasks")
-            .args(["/Query", "/TN", TASK_NAME])
+            .args(["/Query", "/TN", task_name])
             .creation_flags(CREATE_NO_WINDOW)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
             .map(|s| s.success())
             .unwrap_or(false)
+    }
+
+    fn task_is_valid(task_name: &str, expected_exe: &Path, expected_args: &str) -> bool {
+        let output = Command::new("schtasks")
+            .args(["/Query", "/TN", task_name, "/XML"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+        let Ok(out) = output else {
+            return false;
+        };
+        if !out.status.success() {
+            return false;
+        }
+        let xml = String::from_utf8_lossy(&out.stdout).to_ascii_lowercase();
+        if !xml.contains("highestavailable") {
+            return false;
+        }
+        let exe_norm = normalize_path(&expected_exe.display().to_string());
+        if !xml.contains(&exe_norm) {
+            return false;
+        }
+        if !expected_args.is_empty() && !xml.contains(&expected_args.to_ascii_lowercase()) {
+            return false;
+        }
+        true
     }
 
     fn xml_escape(s: &str) -> String {
@@ -124,16 +151,12 @@ mod imp {
     }
 
     fn create_scheduled_task(exe: &Path) -> Result<(), String> {
-        delete_scheduled_task();
-
         let exe_str = xml_escape(&exe.display().to_string());
         let work_dir = exe
             .parent()
             .map(|p| xml_escape(&p.display().to_string()))
             .unwrap_or_else(|| exe_str.clone());
 
-        // HighestAvailable: logon'da yonetici hakki (UAC'siz, admin grubu kullanicilar icin).
-        // Run registry kullanilmiyor — non-elevated instance bypass'i bozuyordu.
         let xml = format!(
             r#"<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
@@ -207,19 +230,109 @@ mod imp {
         ))
     }
 
-    fn delete_scheduled_task() {
+    fn delete_scheduled_task(task_name: &str) {
         let _ = Command::new("schtasks")
-            .args(["/Delete", "/TN", TASK_NAME, "/F"])
+            .args(["/Delete", "/TN", task_name, "/F"])
             .creation_flags(CREATE_NO_WINDOW)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status();
     }
 
+    fn create_launch_task(exe: &Path) -> Result<(), String> {
+        let exe_str = xml_escape(&exe.display().to_string());
+        let work_dir = exe
+            .parent()
+            .map(|p| xml_escape(&p.display().to_string()))
+            .unwrap_or_else(|| exe_str.clone());
+
+        let xml = format!(
+            r#"<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>DPIReaper on-demand elevated launch (no UAC after first approval)</Description>
+  </RegistrationInfo>
+  <Triggers />
+  <Principals>
+    <Principal id="Author">
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <Enabled>true</Enabled>
+    <Hidden>true</Hidden>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>{exe_str}</Command>
+      <WorkingDirectory>{work_dir}</WorkingDirectory>
+    </Exec>
+  </Actions>
+</Task>"#
+        );
+
+        let xml_path = std::env::temp_dir().join("dpireaper_launch_task.xml");
+        write_utf16_xml(&xml_path, &xml)?;
+
+        let output = Command::new("schtasks")
+            .args([
+                "/Create",
+                "/TN",
+                LAUNCH_TASK_NAME,
+                "/XML",
+                &xml_path.to_string_lossy(),
+                "/F",
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map_err(|e| format!("schtasks launch create: {}", e))?;
+
+        let _ = fs::remove_file(&xml_path);
+
+        if output.status.success() {
+            return Ok(());
+        }
+        Err(format!(
+            "Launch gorevi olusturulamadi: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ))
+    }
+
+    pub fn ensure_launch_task() -> Result<(), String> {
+        if !is_process_elevated() {
+            return Ok(());
+        }
+        let exe = exe_path()?;
+        if task_is_valid(LAUNCH_TASK_NAME, &exe, "") {
+            return Ok(());
+        }
+        create_launch_task(&exe)
+    }
+
+    pub fn try_run_via_launch_task() -> bool {
+        if !task_exists(LAUNCH_TASK_NAME) {
+            return false;
+        }
+        Command::new("schtasks")
+            .args(["/Run", "/TN", LAUNCH_TASK_NAME])
+            .creation_flags(CREATE_NO_WINDOW)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    }
+
     pub fn is_enabled() -> Result<bool, String> {
         read_pref().map_or_else(
-            || Ok(task_exists()),
-            |pref| Ok(pref && task_exists()),
+            || Ok(task_exists(TASK_NAME)),
+            |pref| Ok(pref && task_exists(TASK_NAME)),
         )
     }
 
@@ -229,12 +342,22 @@ mod imp {
 
         if enabled {
             let exe = exe_path()?;
-            // Eski Run kaydini kaldir — non-elevated boot connect'i bozar.
             delete_run_registry();
+
+            if task_is_valid(TASK_NAME, &exe, "--autostart") {
+                return Ok(());
+            }
+
+            if !is_process_elevated() {
+                return Err(
+                    "Açılışta başlat görevi oluşturmak için yönetici izni gerekli.".to_string(),
+                );
+            }
+
             create_scheduled_task(&exe)?;
         } else {
             delete_run_registry();
-            delete_scheduled_task();
+            delete_scheduled_task(TASK_NAME);
         }
         Ok(())
     }
@@ -244,13 +367,17 @@ mod imp {
 
         let want = match read_pref() {
             Some(v) => v,
-            None => task_exists(),
+            None => task_exists(TASK_NAME),
         };
 
         if want {
-            let _ = set_enabled(true);
+            delete_run_registry();
+            if let Ok(exe) = exe_path() {
+                if !task_is_valid(TASK_NAME, &exe, "--autostart") && is_process_elevated() {
+                    let _ = create_scheduled_task(&exe);
+                }
+            }
         } else {
-            // Gecis: eski surumlerden kalan Run kaydini temizle
             delete_run_registry();
         }
     }
@@ -268,6 +395,12 @@ mod imp {
         Err("Autostart yalnizca Windows'ta desteklenir.".to_string())
     }
     pub fn heal_on_startup() {}
+    pub fn ensure_launch_task() -> Result<(), String> {
+        Ok(())
+    }
+    pub fn try_run_via_launch_task() -> bool {
+        false
+    }
 }
 
 #[cfg(not(windows))]

@@ -10,6 +10,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Command, open as openShell } from "@tauri-apps/plugin-shell";
 import { invoke } from "@tauri-apps/api/core";
 import { getTranslations, detectSystemLang } from "./i18n";
+import { localizeConflictFinding } from "./i18n/conflictFindings";
 import { DNS_MAP, DOH_MAP, APP, RETRY_DELAYS, DPI_TIMEOUTS, LS_KEYS, URLS } from "./constants";
 import { buildProxyEngineArgs } from "./profiles";
 import { checkForAppUpdate } from "./utils/checkUpdate";
@@ -230,9 +231,12 @@ function App() {
         const raw = localStorage.getItem(LS_KEYS.config);
         const saved = raw ? JSON.parse(raw) : {};
         if (saved.autoStart === true) {
-          const ok = await invoke('set_autostart_enabled', { enabled: true });
-          if (!ok) {
-            console.warn('Autostart re-apply returned false');
+          const admin = await invoke('check_admin').catch(() => false);
+          if (admin) {
+            const ok = await invoke('set_autostart_enabled', { enabled: true });
+            if (!ok) {
+              console.warn('Autostart re-apply returned false');
+            }
           }
         }
       } catch (e) {
@@ -780,6 +784,22 @@ function App() {
     // Max 20 retries
     if (portRetryCount >= APP.maxPortRetries) {
       addLog(t.logNoPort, "error", { i18nKey: "logNoPort" });
+      try {
+        const scan = await invoke("scan_dpi_conflicts");
+        if (scan?.findings?.length) {
+          const n = scan.findings.length;
+          addLog(
+            typeof t.conflictScanFound === 'function' ? t.conflictScanFound(n) : t.conflictScanFound,
+            "warn",
+            { i18nKey: "conflictScanFound", i18nParams: [n] },
+          );
+          scan.findings.slice(0, 4).forEach((f) => {
+            const loc = localizeConflictFinding(f, t);
+            addLog(`${loc.title}: ${loc.detail}`, f.severity === "critical" ? "error" : "warn");
+          });
+          addLog(t.conflictScanHint, "info", { i18nKey: "conflictScanHint" });
+        }
+      } catch (_) { /* ignore */ }
       setIsProcessing(false);
       isStartingEngine.current = false;
       return;
@@ -1006,6 +1026,7 @@ function App() {
           addLog(t.logConnected, "success", { i18nKey: "logConnected" });
           notifyUser(APP.name, t.logConnected, "connect");
           updateTrayTooltip("connected");
+          invoke("ensure_proxy_guard_installed").catch(() => {});
           if (configRef.current.lanSharing) {
             (async () => {
               try {
@@ -1736,15 +1757,30 @@ function App() {
 
   const stableRequestDefenderExclusion = useCallback(async () => {
     try {
+      const admin = await invoke('check_admin');
+      if (!admin) {
+        addLog(t.logDefenderExclusionFailed, 'warn', { i18nKey: 'logDefenderExclusionFailed' });
+        return { success: false, reason: 'admin' };
+      }
       await invoke('add_defender_exclusions');
       localStorage.setItem(LS_KEYS.defenderExclusionDecision, 'added');
       setDefenderDecision('added');
-      return true;
+      return { success: true };
     } catch (e) {
+      const msg = typeof e === 'string' ? e : (e?.message || e?.toString?.() || String(e));
       addLog(t.logDefenderExclusionFailed, 'warn', { i18nKey: 'logDefenderExclusionFailed' });
-      return false;
+      return { success: false, reason: 'error', message: msg };
     }
   }, [t.logDefenderExclusionFailed]);
+
+  const stableRelaunchAsAdmin = useCallback(async () => {
+    try {
+      await invoke('relaunch_as_admin');
+    } catch (e) {
+      const msg = typeof e === 'string' ? e : (e?.message || e?.toString?.() || String(e));
+      addLog(msg || t.adminDesc, 'warn');
+    }
+  }, [t.adminDesc]);
 
   const handleAutostartError = useCallback(() => {
     addLog(t.autostartEnableFailed, 'warn', { i18nKey: 'autostartEnableFailed' });
@@ -1769,7 +1805,6 @@ function App() {
   if (!appIsClosingState && showSettings && !showLogs && settingsSnapRef.current) {
     return (
       <div className="settings-standalone-root">
-        <div className="window-drag" data-tauri-drag-region />
         <Settings
           initialConfig={settingsSnapRef.current}
           onClose={handleSettingsClose}
@@ -1778,6 +1813,7 @@ function App() {
           currentPort={currentPort}
           defenderDecision={defenderDecision}
           requestDefenderExclusion={stableRequestDefenderExclusion}
+          relaunchAsAdmin={stableRelaunchAsAdmin}
           onAutostartError={handleAutostartError}
         />
         <UpdateAvailableModal
@@ -2315,19 +2351,6 @@ function App() {
                       </>
                     )}
                   </div>
-                  {/* Health indicator — same row, right side */}
-                  {healthStatus && (
-                    <div className={`health-indicator ${healthStatus.ok ? 'is-ok' : 'is-fail'}`}>
-                      <span className="health-indicator-dot" />
-                      <span className="health-indicator-text">
-                        {healthStatus.ok
-                          ? (healthStatus.latencyMs > 0
-                              ? `${t.healthLabelOk} · ${healthStatus.latencyMs}ms`
-                              : t.healthLabelOk)
-                          : t.healthLabelFail}
-                      </span>
-                    </div>
-                  )}
                 </div>
                 <BypassGraph stats={bypassStats} t={t} visible />
               </motion.div>
@@ -2335,6 +2358,27 @@ function App() {
           })()}
         </AnimatePresence>
       </main>
+
+      {/* Top-left: proxy health when connected */}
+      <AnimatePresence>
+        {isConnected && !isProcessing && healthStatus && (
+          <motion.div
+            key="health-corner"
+            className="main-corner-bar main-corner-bar--left"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.18 }}
+          >
+            <div className={`health-indicator ${healthStatus.ok ? 'is-ok' : 'is-fail'}`}>
+              <span className="health-indicator-dot" />
+              <span className="health-indicator-text">
+                {healthStatus.ok ? t.healthLabelOk : t.healthLabelFail}
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Top-right: connect (LAN) + donate */}
       <div className="main-corner-bar">

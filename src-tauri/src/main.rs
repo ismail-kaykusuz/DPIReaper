@@ -50,6 +50,14 @@ fn main() {
                 .stdout(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null())
                 .status();
+
+            // WinHTTP proxy reset (panic cleanup)
+            let _ = std::process::Command::new("netsh")
+                .args(["winhttp", "reset", "proxy"])
+                .creation_flags(CREATE_NO_WINDOW)
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status();
         }
 
         eprintln!("DPIReaper PANIC: {}", panic_info);

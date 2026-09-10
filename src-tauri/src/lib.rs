@@ -1,5 +1,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+mod conflict_scan;
 mod isp_detect;
+mod proxy_guard;
 mod setup_page;
 mod windows_autostart;
 mod update_check;
@@ -1086,7 +1088,13 @@ fn relaunch_as_admin() -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         if check_admin() {
+            let _ = windows_autostart::ensure_launch_task();
             return Ok(());
+        }
+
+        // One-time UAC: subsequent launches use DPIReaperLaunch scheduled task.
+        if windows_autostart::try_run_via_launch_task() {
+            std::process::exit(0);
         }
 
         use std::ffi::OsStr;
@@ -1562,15 +1570,13 @@ fn list_network_interfaces() -> Vec<NetworkInterfaceInfo> {
 }
 
 /// C16: Genişletilmiş onarım — WinHTTP reset + flushdns + firewall + proxy clear.
-#[tauri::command]
-fn repair_internet_extended() -> Result<String, String> {
+pub(crate) fn repair_internet_extended_internal() -> Result<(), String> {
     let _ = clear_system_proxy();
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-        // 1. WinHTTP reset
         let _ = std::process::Command::new("netsh")
             .args(&["winhttp", "reset", "proxy"])
             .creation_flags(CREATE_NO_WINDOW)
@@ -1578,7 +1584,6 @@ fn repair_internet_extended() -> Result<String, String> {
             .stderr(std::process::Stdio::null())
             .status();
 
-        // 2. DNS cache
         let _ = std::process::Command::new("ipconfig")
             .arg("/flushdns")
             .creation_flags(CREATE_NO_WINDOW)
@@ -1586,13 +1591,36 @@ fn repair_internet_extended() -> Result<String, String> {
             .stderr(std::process::Stdio::null())
             .status();
 
-        // 3. Firewall rules — kurulu kuralları temizle
         manage_firewall_rules(false, 0, 0);
-
-        // 4. Tarayıcılara bildir
         notify_proxy_change();
     }
+    Ok(())
+}
+
+#[tauri::command]
+fn repair_internet_extended() -> Result<String, String> {
+    repair_internet_extended_internal()?;
     Ok("OK".into())
+}
+
+#[tauri::command]
+fn scan_dpi_conflicts() -> conflict_scan::ConflictScanResult {
+    conflict_scan::scan_dpi_conflicts()
+}
+
+#[tauri::command]
+fn stop_dpi_conflicts() -> Result<conflict_scan::DeepRepairResult, String> {
+    conflict_scan::stop_dpi_conflicts()
+}
+
+#[tauri::command]
+fn deep_repair_network() -> Result<conflict_scan::DeepRepairResult, String> {
+    conflict_scan::deep_repair_network()
+}
+
+#[tauri::command]
+fn ensure_proxy_guard_installed() -> Result<(), String> {
+    proxy_guard::ensure_proxy_guard_task()
 }
 
 /// C3: Özel bypass listesini Windows Registry ProxyOverride'a uygula.
@@ -1660,12 +1688,31 @@ fn apply_webview2_gpu_env_from_prefs() {
 #[cfg(not(windows))]
 fn apply_webview2_gpu_env_from_prefs() {}
 
+/// Headless proxy guard — invoked via `--proxy-guard` before Tauri starts.
+pub fn run_proxy_guard_mode() -> i32 {
+    #[cfg(windows)]
+    {
+        return proxy_guard::run_proxy_guard_mode();
+    }
+    #[cfg(not(windows))]
+    {
+        0
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Set CWD to exe directory — autostart via Run key may start with CWD System32.
     if let Ok(exe) = std::env::current_exe() {
         if let Some(parent) = exe.parent() {
             let _ = std::env::set_current_dir(parent);
+        }
+    }
+
+    #[cfg(windows)]
+    {
+        if std::env::args().any(|a| a == "--proxy-guard") {
+            std::process::exit(run_proxy_guard_mode());
         }
     }
 
@@ -1717,6 +1764,14 @@ pub fn run() {
         .manage(PacServerState::default())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
+            #[cfg(windows)]
+            {
+                if check_admin() {
+                    let _ = windows_autostart::ensure_launch_task();
+                    let _ = proxy_guard::ensure_proxy_guard_task();
+                }
+            }
+
             #[cfg(desktop)]
             {
                 use tauri::menu::{Menu, MenuItem};
@@ -1859,6 +1914,10 @@ pub fn run() {
             list_network_interfaces,
             repair_internet_extended,
             apply_custom_bypass,
+            scan_dpi_conflicts,
+            stop_dpi_conflicts,
+            deep_repair_network,
+            ensure_proxy_guard_installed,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
