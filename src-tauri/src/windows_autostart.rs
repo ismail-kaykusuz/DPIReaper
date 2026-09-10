@@ -316,7 +316,14 @@ mod imp {
     }
 
     pub fn try_run_via_launch_task() -> bool {
+        let Ok(exe) = exe_path() else {
+            return false;
+        };
         if !task_exists(LAUNCH_TASK_NAME) {
+            return false;
+        }
+        // Stale dev-build or old install path — never launch the wrong binary.
+        if !task_is_valid(LAUNCH_TASK_NAME, &exe, "") {
             return false;
         }
         Command::new("schtasks")
@@ -364,6 +371,11 @@ mod imp {
 
     pub fn heal_on_startup() {
         clear_run_as_admin_shims();
+
+        if is_process_elevated() {
+            let _ = ensure_launch_task();
+            let _ = crate::proxy_guard::ensure_proxy_guard_task();
+        }
 
         let want = match read_pref() {
             Some(v) => v,
